@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IR-Flutter Package Downloader & Mirror Manager | مدیریت میرورهای فلاتر و گریدل</title>
+  <meta name="description" content="ابزار جامع خط فرمان و راهنمای میرورهای فلاتر، دارت و اندروید گریدل در ایران برای رفع تحریم و افزایش سرعت دانلود.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --primary: #58a6ff;
+      --accent: #2ea043;
+      --accent-hover: #3fb950;
+      --code-bg: #0b0e14;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Vazirmatn', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); line-height: 1.6; padding-bottom: 60px; }
+    header {
+      background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 40px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--primary);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 16px;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+    }
+    h1 { font-size: 2.4rem; font-weight: 900; margin-bottom: 12px; color: #fff; }
+    .subtitle { font-size: 1.15rem; color: var(--text-muted); max-width: 700px; margin: 0 auto 28px; }
+    .btn-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); }
+    .btn-secondary { background: #21262d; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #30363d; transform: translateY(-2px); }
+
+    .container { max-width: 1050px; margin: 40px auto 0; padding: 0 20px; }
+    .section-title { font-size: 1.6rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    /* Code blocks */
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0;
+      direction: ltr;
+      font-family: monospace;
+      font-size: 0.9rem;
+      overflow-x: auto;
+    }
+    .code-text { color: #79c0ff; white-space: nowrap; }
+    .copy-btn {
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: #30363d; }
+
+    /* Tables */
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+    th { background: rgba(255,255,255,0.03); color: var(--primary); font-weight: 700; }
+    tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* Platforms grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 16px; }
+    .platform-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .platform-card h3 { font-size: 1.15rem; margin-bottom: 8px; }
+    .platform-card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px; }
+
+    .tag-online { background: rgba(46, 160, 67, 0.2); color: #3fb950; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; }
+    .tag-dns { background: rgba(88, 166, 255, 0.2); color: #58a6ff; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; }
+
+    footer { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: 60px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">نسخه ۱.۰.۰ — کاملاً رایگان و متن‌باز</div>
+    <h1>IR-Flutter Package Downloader</h1>
+    <p class="subtitle">ابزار جامع خط فرمان و مرجع کامل میرورها برای رفع تحریم و افزایش سرعت دانلود پکیج‌های فلاتر، دارت و گریدل در ایران</p>
+    <div class="btn-group">
+      <a href="#quick-install" class="btn btn-primary">⚡ نصب سریع یک‌خطی</a>
+      <a href="#mirrors-list" class="btn btn-secondary">📋 لیست و تست میرورها</a>
+      <a href="https://github.com/IR-Flutter/PackageDownloader" class="btn btn-secondary" target="_blank">⭐ ریپازیتوری در گیت‌هاب</a>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Quick Install -->
+    <section id="quick-install">
+      <div class="section-title">⚡ نصب و راه‌اندازی سریع با یک دستور</div>
+      <div class="card">
+        <p style="margin-bottom: 12px;">کافی است بر اساس سیستم‌عامل خود دستور مربوطه را در ترمینال کپی و اجرا کنید:</p>
+
+        <h4 style="color: var(--primary); margin-top: 14px;">🍏 مک و 🐧 لینوکس (macOS / Linux):</h4>
+        <div class="code-box">
+          <span class="code-text" id="cmd-unix">curl -fsSL https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.sh | bash</span>
+          <button class="copy-btn" onclick="copyToClipboard('cmd-unix')">کپی دستور</button>
+        </div>
+
+        <h4 style="color: var(--primary); margin-top: 20px;">🪟 ویندوز (PowerShell):</h4>
+        <div class="code-box">
+          <span class="code-text" id="cmd-win">irm https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.ps1 | iex</span>
+          <button class="copy-btn" onclick="copyToClipboard('cmd-win')">کپی دستور</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mirrors Directory -->
+    <section id="mirrors-list">
+      <div class="section-title">🌐 لیست کامل میرورهای فعال در ایران</div>
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>نام میرور</th>
+                <th>پوشش سرویس</th>
+                <th>آدرس Flutter & Dart</th>
+                <th>آدرس Gradle Maven</th>
+                <th>دستور فعال‌سازی</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>PUB-AZS</strong></td>
+                <td><span class="tag-online">فلاتر + دارت + گریدل</span></td>
+                <td><code>https://pub-azs.ir</code></td>
+                <td><code>https://pub-azs.ir/api/mavens/</code></td>
+                <td><code>irflutter use pub-azs</code></td>
+              </tr>
+              <tr>
+                <td><strong>Flutter Community (CN)</strong></td>
+                <td><span class="tag-online">فلاتر + دارت</span></td>
+                <td><code>https://pub.flutter-io.cn</code></td>
+                <td>—</td>
+                <td><code>irflutter use flutter-cn</code></td>
+              </tr>
+              <tr>
+                <td><strong>تنظیمات پیش‌فرض (رسمی)</strong></td>
+                <td><span class="tag-dns">مخازن رسمی گوگل</span></td>
+                <td><code>https://pub.dev</code></td>
+                <td>مخازن رسمی Maven Central</td>
+                <td><code>irflutter reset</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Direct Binaries -->
+    <section>
+      <div class="section-title">📦 دانلود مستقیم فایل اجرایی (برای همه سیستم‌عامل‌ها)</div>
+      <div class="grid">
+        <div class="platform-card">
+          <h3>🪟 Windows (x64)</h3>
+          <p>فایل اجرایی مستقل بدون نیاز به نصب پیش‌نیاز یا ران‌تایم اضافی</p>
+          <a href="https://github.com/IR-Flutter/PackageDownloader/releases/latest/download/irflutter-windows-x64.exe" class="btn btn-secondary">دانلود irflutter.exe</a>
+        </div>
+        <div class="platform-card">
+          <h3>🍏 macOS (Apple Silicon M1/M2/M3)</h3>
+          <p>کامپایل بومی برای مک‌های سری ARM64 با بالاترین سرعت</p>
+          <a href="https://github.com/IR-Flutter/PackageDownloader/releases/latest/download/irflutter-macos-arm64" class="btn btn-secondary">دانلود باینری مک ARM64</a>
+        </div>
+        <div class="platform-card">
+          <h3>🍏 macOS (Intel x64)</h3>
+          <p>برای پردازنده‌های اینتل قدیمی‌تر در مک</p>
+          <a href="https://github.com/IR-Flutter/PackageDownloader/releases/latest/download/irflutter-macos-x64" class="btn btn-secondary">دانلود باینری مک Intel</a>
+        </div>
+        <div class="platform-card">
+          <h3>🐧 Linux (x64)</h3>
+          <p>سازگار با اوبونتو، دبیان، فدورا، آرچ و سایر توزیع‌ها</p>
+          <a href="https://github.com/IR-Flutter/PackageDownloader/releases/latest/download/irflutter-linux-x64" class="btn btn-secondary">دانلود باینری لینوکس</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLI Commands Guide -->
+    <section style="margin-top: 40px;">
+      <div class="section-title">💻 راهنمای دستورات خط فرمان (CLI)</div>
+      <div class="card">
+        <div class="code-box">
+          <span class="code-text">irflutter list</span>
+          <span style="color: var(--text-muted);">نمایش لیست تمام میرورهای ثبت شده</span>
+        </div>
+        <div class="code-box">
+          <span class="code-text">irflutter test</span>
+          <span style="color: var(--text-muted);">تست سرعت و تاخیر (Ping) میرورها</span>
+        </div>
+        <div class="code-box">
+          <span class="code-text">irflutter use pub-azs</span>
+          <span style="color: var(--text-muted);">فعال‌سازی میرور pub-azs و تنظیم متغیرهای محیطی + گریدل</span>
+        </div>
+        <div class="code-box">
+          <span class="code-text">irflutter reset</span>
+          <span style="color: var(--text-muted);">حذف میرورها و بازگشت به تنظیمات اصلی گوگل</span>
+        </div>
+        <div class="code-box">
+          <span class="code-text">irflutter status</span>
+          <span style="color: var(--text-muted);">مشاهده وضعیت فعلی متغیرهای محیطی و فایل‌های تنظیمات</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>توسعه داده شده توسط جامعه <a href="https://github.com/IR-Flutter" style="color: var(--primary); text-decoration: none;">IR-Flutter</a> | تحت لایسنس MIT</p>
+  </footer>
+
+  <script>
+    function copyToClipboard(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('دستور در کلیپ‌بورد کپی شد!');
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+name: irflutter
+description: A lightweight, cross-platform CLI tool to manage and switch Flutter, Dart, and Gradle mirrors in Iran.
+version: 1.0.0
+homepage: https://github.com/IR-Flutter/PackageDownloader
+repository: https://github.com/IR-Flutter/PackageDownloader.git
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+executables:
+  irflutter: irflutter
