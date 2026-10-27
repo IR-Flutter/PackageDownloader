@@ -6,3 +6,4 @@ irflutter.exe
 *.log
 *.bak
 .DS_Store
+pubspec.lock
