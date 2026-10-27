@@ -1,10 +1,14 @@
 # 🚀 IR-Flutter Package Downloader & Mirror Manager
 
-ابزار خط فرمان متن‌باز، فوق‌العاده سبک و چندسکویی (Cross-Platform) برای مدیریت، تست و تغییر آنی میرورهای فلاتر، دارت و گریدل در ایران جهت دور زدن تحریم‌ها و رفع مشکلات فیلترینگ یا کندی سرعت.
+ابزار خط فرمان متن‌باز، سبک و چندسکویی (Cross-Platform) برای مدیریت، تست و تغییر آنی میرورهای فلاتر، دارت و گریدل در ایران جهت دور زدن تحریم‌ها و رفع مشکلات فیلترینگ یا کندی سرعت.
+
+شامل تمامی میرورهای رسمی، مراجع ایرانی و فهرست میرورهای ارائه‌شده در [ramineslami.ir/mirrors](https://ramineslami.ir/mirrors).
 
 [![Release](https://img.shields.io/github/v/release/IR-Flutter/PackageDownloader?color=blue&label=Latest%20Release)](https://github.com/IR-Flutter/PackageDownloader/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build & Release](https://github.com/IR-Flutter/PackageDownloader/actions/workflows/release.yml/badge.svg)](https://github.com/IR-Flutter/PackageDownloader/actions)
+
+🌐 **صفحه وب راهنما و دایرکتوری آنلاین:** [https://ir-flutter.github.io/PackageDownloader/](https://ir-flutter.github.io/PackageDownloader/)
 
 ---
 
@@ -22,19 +26,23 @@ irm https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.
 
 ---
 
-## 🌐 لیست میرورهای پشتیبانی‌شده در ایران
+## 🌐 لیست کامل میرورهای پشتیبانی‌شده در ایران
 
-| نام میرور | پوشش سرویس | آدرس Flutter & Dart | آدرس Gradle Maven | دستور فعال‌سازی |
-| :--- | :--- | :--- | :--- | :--- |
-| **PUB-AZS** | فلاتر + دارت + گریدل | `https://pub-azs.ir` | `https://pub-azs.ir/api/mavens/` | `irflutter use pub-azs` |
-| **Flutter Community (CN)** | فلاتر + دارت | `https://pub.flutter-io.cn` | — | `irflutter use flutter-cn` |
-| **مخازن رسمی (گوگل)** | مخازن اصلی | `https://pub.dev` | مخازن رسمی Maven | `irflutter reset` |
+| نام میرور | پوشش سرویس | منبع / مرجع | آدرس Flutter & Dart | آدرس Gradle Maven | دستور فعال‌سازی |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **PUB-AZS** | فلاتر + دارت + گریدل | جامعه فلاتر | `https://pub-azs.ir` | `https://pub-azs.ir/api/mavens/` | `irflutter use pub-azs` |
+| **Runflare (رن‌فلر)** | فلاتر + دارت + گریدل | رامین اسلامی | `https://mirror-flutter.runflare.com` | `https://mirror-maven.runflare.com/maven2/` | `irflutter use runflare` |
+| **Jamko / Chrepo** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://gradle.chrepo.ir` | `irflutter use-gradle jamko` |
+| **IranServer (ایران‌سرور)** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://maven.iranserver.com/repository/maven/` | `irflutter use-gradle iranserver` |
+| **ITO National (سازمان فناوری)** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://archive.ito.gov.ir/gradle/maven_central/` | `irflutter use-gradle ito` |
+| **Flutter Community (CN)** | فلاتر + دارت | جامعه فلاتر | `https://pub.flutter-io.cn` | — | `irflutter use-flutter flutter-cn` |
+| **مخازن رسمی (گوگل)** | بدون میرور | مخازن اصلی | `https://pub.dev` | مخازن اصلی Maven | `irflutter reset` |
 
 ---
 
 ## 💻 دستورات و نحوه استفاده (Usage)
 
-### ۱. مشاهده لیست میرورها:
+### ۱. مشاهده لیست کامل میرورها:
 ```bash
 irflutter list
 ```
@@ -44,22 +52,32 @@ irflutter list
 irflutter test
 ```
 
-### ۳. فعال‌سازی یک میرور:
-به عنوان مثال برای فعال‌سازی میرور `pub-azs`:
+### ۳. فعال‌سازی کامل میرور (فلاتر + گریدل):
 ```bash
 irflutter use pub-azs
+# یا
+irflutter use runflare
 ```
-این دستور کارهای زیر را به صورت خودکار انجام می‌دهد:
-* متغیرهای محیطی `PUB_HOSTED_URL` و `FLUTTER_STORAGE_BASE_URL` را در شل سیستم (`.bashrc` / `.zshrc` یا رجیستری ویندوز) ثبت می‌کند.
-* فایل `init.gradle` را در مسیر `~/.gradle/init.gradle` ایجاد کرده و تمام مخازن Maven را به میرور مدنظر هدایت می‌کند.
-* تنظیمات تایم‌اوت (`socketTimeout` و `connectionTimeout`) را در `~/.gradle/gradle.properties` اعمال می‌کند تا دانلود پکیج‌های سنگین قطع نشود.
 
-### ۴. بازگشت به تنظیمات اصلی (غیرفعال‌سازی میرور):
+### ۴. فعال‌سازی اختصاصی گریدل (Gradle/Maven):
+اگر می‌خواهید فقط پکیج‌های اندروید گریدل از میرورهایی مثل جامکو یا ایران‌سرور دانلود شوند:
+```bash
+irflutter use-gradle jamko
+# یا
+irflutter use-gradle iranserver
+```
+
+### ۵. فعال‌سازی اختصاصی فلاتر و دارت:
+```bash
+irflutter use-flutter flutter-cn
+```
+
+### ۶. بازگشت به تنظیمات اصلی (غیرفعال‌سازی میرور):
 ```bash
 irflutter reset
 ```
 
-### ۵. مشاهده وضعیت فعلی سیستم:
+### ۷. مشاهده وضعیت فعلی سیستم:
 ```bash
 irflutter status
 ```
@@ -68,19 +86,16 @@ irflutter status
 
 ## 📦 دانلود دستی فایل‌های اجرایی (Releases)
 
-در صفحه [GitHub Releases](https://github.com/IR-Flutter/PackageDownloader/releases)، خروجی‌های کامپایل‌شده آماده برای انواع سیستم‌عامل‌ها موجود است:
+در صفحه [GitHub Releases](https://github.com/IR-Flutter/PackageDownloader/releases)، فایل‌های اجرایی کامپایل‌شده بدون نیاز به ران‌تایم Dart برای سیستم‌عامل‌های زیر در دسترس است:
 * **ویندوز:** `irflutter-windows-x64.exe`
-* **مک (Apple Silicon M1/M2/M3/M4):** `irflutter-macos-arm64`
+* **مک (Apple Silicon M1..M4):** `irflutter-macos-arm64`
 * **مک (Intel):** `irflutter-macos-x64`
 * **لینوکس:** `irflutter-linux-x64`
-
-این فایل‌ها نیازی به نصب ران‌تایم، پایتون یا Dart روی سیستم مقصد ندارند و به صورت باینری مستقل (Standalone Binary) اجرا می‌شوند.
 
 ---
 
 ## 🛠 کامپایل دستی از سورس کد
 
-اگر می‌خواهید خودتان سورس کد را تغییر داده و کامپایل کنید:
 ```bash
 git clone https://github.com/IR-Flutter/PackageDownloader.git
 cd PackageDownloader
