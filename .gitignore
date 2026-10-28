@@ -7,3 +7,4 @@ irflutter.exe
 *.bak
 .DS_Store
 pubspec.lock
+.idea
