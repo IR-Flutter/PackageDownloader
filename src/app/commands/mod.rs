@@ -320,12 +320,16 @@ async fn handle_use(
         let mut vars = Vec::new();
         if has_flutter {
             if let Some(ref f) = mirror.providers.flutter {
-                vars.push(("FLUTTER_STORAGE_BASE_URL", f.storage_url.as_str()));
+                if let Some(ref url) = f.storage_url {
+                    vars.push(("FLUTTER_STORAGE_BASE_URL", url.as_str()));
+                }
             }
         }
         if has_dart {
             if let Some(ref d) = mirror.providers.dart {
-                vars.push(("PUB_HOSTED_URL", d.hosted_url.as_str()));
+                if let Some(ref url) = d.hosted_url {
+                    vars.push(("PUB_HOSTED_URL", url.as_str()));
+                }
             }
         }
 
@@ -592,12 +596,16 @@ async fn handle_list(registry: &RegistryManager, args: ListArgs, json: bool) -> 
 
         if let Some(dart) = &m.providers.dart {
             if dart.enabled {
-                println!("   Pub Hosted:  {}", dart.hosted_url);
+                if let Some(ref u) = dart.hosted_url {
+                    println!("   Pub Hosted:  {}", u);
+                }
             }
         }
         if let Some(flutter) = &m.providers.flutter {
             if flutter.enabled {
-                println!("   Flutter GCS: {}", flutter.storage_url);
+                if let Some(ref u) = flutter.storage_url {
+                    println!("   Flutter GCS: {}", u);
+                }
             }
         }
         if let Some(gradle) = &m.providers.gradle {
@@ -642,13 +650,15 @@ async fn handle_mirror(registry: &RegistryManager, args: MirrorArgs, json: bool)
                 if let Some(f) = mirror.providers.flutter {
                     println!(
                         "     • Flutter Storage: enabled={}, url={}",
-                        f.enabled, f.storage_url
+                        f.enabled,
+                        f.storage_url.as_deref().unwrap_or("none")
                     );
                 }
                 if let Some(d) = mirror.providers.dart {
                     println!(
                         "     • Dart/Pub:        enabled={}, url={}",
-                        d.enabled, d.hosted_url
+                        d.enabled,
+                        d.hosted_url.as_deref().unwrap_or("none")
                     );
                 }
                 if let Some(g) = mirror.providers.gradle {

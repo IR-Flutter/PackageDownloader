@@ -6,7 +6,7 @@ use rand::rngs::OsRng;
 
 /// Embedded trusted Ed25519 public key for verifying registry authenticity.
 /// Base64 encoded 32-byte Ed25519 public key.
-pub const EMBEDDED_REGISTRY_PUBLIC_KEY: &str = "H/QvH3DVHuewz11+IEs7W0awXlFgCNoJ/NnSfKJk6Ts="; // Production Ed25519 registry trust anchor
+pub const EMBEDDED_REGISTRY_PUBLIC_KEY: &str = "qa953ivnWXnctJ2hawKiWTEPQhE3t/970TKNsi6fEao="; // Production Ed25519 registry trust anchor
 
 /// Verify an Ed25519 signature over a byte payload.
 pub fn verify_signature(payload: &[u8], signature_b64: &str, public_key_b64: &str) -> Result<()> {

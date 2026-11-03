@@ -56,12 +56,19 @@ impl Provider for FlutterProvider {
             });
         }
 
+        let storage_url = flutter_config.storage_url.as_deref().ok_or_else(|| {
+            PdownError::InvalidConfig(format!(
+                "Mirror '{}' has enabled Flutter provider but storage_url is missing",
+                mirror.id
+            ))
+        })?;
+
         let mut items = Vec::new();
         let shell_files = EnvironmentManager::get_unix_shell_files();
 
         // Preserve current pub hosted url if set
         let pub_val = EnvironmentManager::get_var("PUB_HOSTED_URL");
-        let mut vars = vec![(KEY_FLUTTER_STORAGE_URL, flutter_config.storage_url.as_str())];
+        let mut vars = vec![(KEY_FLUTTER_STORAGE_URL, storage_url)];
         if let Some(ref p) = pub_val {
             vars.push(("PUB_HOSTED_URL", p.as_str()));
         }
@@ -78,10 +85,7 @@ impl Provider for FlutterProvider {
 
         Ok(ChangePlan {
             provider_id: self.id().to_string(),
-            description: format!(
-                "Configure FLUTTER_STORAGE_BASE_URL='{}'",
-                flutter_config.storage_url
-            ),
+            description: format!("Configure FLUTTER_STORAGE_BASE_URL='{}'", storage_url),
             items,
         })
     }

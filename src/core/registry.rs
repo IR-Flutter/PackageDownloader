@@ -521,13 +521,29 @@ impl RegistryManager {
             // 4. Provider endpoints completeness
             if let Some(ref dart) = mirror.providers.dart {
                 if dart.enabled {
-                    Self::validate_url(&dart.hosted_url, "dart.hosted_url", &mirror.id)?;
+                    match &dart.hosted_url {
+                        Some(u) => Self::validate_url(u, "dart.hosted_url", &mirror.id)?,
+                        None => {
+                            return Err(PdownError::RegistryValidation(format!(
+                                "Mirror '{}' has enabled dart provider but hosted_url is missing",
+                                mirror.id
+                            )));
+                        }
+                    }
                 }
             }
 
             if let Some(ref flutter) = mirror.providers.flutter {
                 if flutter.enabled {
-                    Self::validate_url(&flutter.storage_url, "flutter.storage_url", &mirror.id)?;
+                    match &flutter.storage_url {
+                        Some(u) => Self::validate_url(u, "flutter.storage_url", &mirror.id)?,
+                        None => {
+                            return Err(PdownError::RegistryValidation(format!(
+                                "Mirror '{}' has enabled flutter provider but storage_url is missing",
+                                mirror.id
+                            )));
+                        }
+                    }
                 }
             }
 
@@ -631,7 +647,8 @@ mod tests {
         let manager = RegistryManager::new(storage);
 
         let active = manager.load_active().expect("Active registry must load");
-        assert_eq!(active.revision, 1);
+        let bundled = manager.load_bundled().expect("Bundled registry must load");
+        assert_eq!(active.revision, bundled.revision);
     }
 
     #[test]

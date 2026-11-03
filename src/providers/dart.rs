@@ -53,12 +53,19 @@ impl Provider for DartProvider {
             )));
         }
 
+        let hosted_url = dart_config.hosted_url.as_deref().ok_or_else(|| {
+            PdownError::InvalidConfig(format!(
+                "Mirror '{}' has enabled Dart provider but hosted_url is missing",
+                mirror.id
+            ))
+        })?;
+
         let mut items = Vec::new();
         let shell_files = EnvironmentManager::get_unix_shell_files();
 
         // Include current flutter storage url if set
         let flutter_val = EnvironmentManager::get_var("FLUTTER_STORAGE_BASE_URL");
-        let mut vars = vec![(KEY_PUB_HOSTED_URL, dart_config.hosted_url.as_str())];
+        let mut vars = vec![(KEY_PUB_HOSTED_URL, hosted_url)];
         if let Some(ref f) = flutter_val {
             vars.push(("FLUTTER_STORAGE_BASE_URL", f.as_str()));
         }
@@ -75,7 +82,7 @@ impl Provider for DartProvider {
 
         Ok(ChangePlan {
             provider_id: self.id().to_string(),
-            description: format!("Configure PUB_HOSTED_URL='{}'", dart_config.hosted_url),
+            description: format!("Configure PUB_HOSTED_URL='{}'", hosted_url),
             items,
         })
     }

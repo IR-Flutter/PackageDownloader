@@ -64,8 +64,9 @@ pub struct MirrorProviders {
 pub struct FlutterProviderConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
-    pub storage_url: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub test_path: Option<String>,
 }
 
@@ -73,8 +74,9 @@ pub struct FlutterProviderConfig {
 pub struct DartProviderConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
-    pub hosted_url: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosted_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub test_package: Option<String>,
 }
 

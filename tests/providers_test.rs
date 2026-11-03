@@ -82,11 +82,11 @@ fn test_gradle_provider_selective_routing() {
     assert_eq!(plan.provider_id, "gradle");
     assert_eq!(plan.items.len(), 2); // init.d script + properties
 
-    // Verify init.d script content does not route google maven to runflare
+    // Verify init.d script content does not route gradle plugins to runflare
     let script_item = &plan.items[0];
     if let pdown::core::models::ChangeItem::FileWrite { new_content, .. } = script_item {
         assert!(new_content.contains("https://mirror-maven.runflare.com/maven2/"));
-        assert!(new_content.contains("def GOOGLE_MAVEN_MIRROR = null"));
+        assert!(new_content.contains("def GRADLE_PLUGINS_MIRROR = null"));
     } else {
         panic!("Expected FileWrite change item");
     }

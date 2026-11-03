@@ -25,7 +25,7 @@ fn test_registry_manager_bundled_fallback() {
 
     let active = manager.load_active().expect("Active registry should load");
     assert_eq!(active.schema_version, 1);
-    assert_eq!(active.registry_version, "1.0.0");
+    assert_eq!(active.registry_version, "2.1.0");
     assert!(active.mirrors.len() >= 5);
 }
 
@@ -67,8 +67,8 @@ fn test_reject_tampered_cache() {
 
     // Cache should be rejected and bundled returned safely
     let active = manager.load_active().unwrap();
-    assert_eq!(active.revision, 1);
-    assert_eq!(active.registry_version, "1.0.0");
+    assert_eq!(active.revision, 2);
+    assert_eq!(active.registry_version, "2.1.0");
 }
 
 #[test]

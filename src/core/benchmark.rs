@@ -41,33 +41,37 @@ impl BenchmarkEngine {
         // 1. Probe Dart / Pub if enabled
         if let Some(ref dart) = mirror.providers.dart {
             if dart.enabled {
-                let pkg = dart.test_package.as_deref().unwrap_or("http");
-                let url = format!(
-                    "{}/api/packages/{}",
-                    dart.hosted_url.trim_end_matches('/'),
-                    pkg
-                );
-                let res = self
-                    .probe_endpoint(&client, "dart", &url, Some("name"))
-                    .await;
-                probes.push(res);
+                if let Some(ref hosted_url) = dart.hosted_url {
+                    let pkg = dart.test_package.as_deref().unwrap_or("http");
+                    let url = format!(
+                        "{}/api/packages/{}",
+                        hosted_url.trim_end_matches('/'),
+                        pkg
+                    );
+                    let res = self
+                        .probe_endpoint(&client, "dart", &url, Some("name"))
+                        .await;
+                    probes.push(res);
+                }
             }
         }
 
         // 2. Probe Flutter Storage if enabled
         if let Some(ref flutter) = mirror.providers.flutter {
             if flutter.enabled {
-                let path = flutter
-                    .test_path
-                    .as_deref()
-                    .unwrap_or("flutter_infra_release/releases/releases_linux.json");
-                let url = format!(
-                    "{}/{}",
-                    flutter.storage_url.trim_end_matches('/'),
-                    path.trim_start_matches('/')
-                );
-                let res = self.probe_endpoint(&client, "flutter", &url, None).await;
-                probes.push(res);
+                if let Some(ref storage_url) = flutter.storage_url {
+                    let path = flutter
+                        .test_path
+                        .as_deref()
+                        .unwrap_or("flutter_infra_release/releases/releases_linux.json");
+                    let url = format!(
+                        "{}/{}",
+                        storage_url.trim_end_matches('/'),
+                        path.trim_start_matches('/')
+                    );
+                    let res = self.probe_endpoint(&client, "flutter", &url, None).await;
+                    probes.push(res);
+                }
             }
         }
 

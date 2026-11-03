@@ -20,7 +20,7 @@ fn test_cli_list_mirrors() {
 
     assert!(stdout.contains("PUB-AZS Community Mirror"));
     assert!(stdout.contains("Runflare Cloud Mirrors"));
-    assert!(stdout.contains("Flutter Community Mirror (CN)"));
+    assert!(stdout.contains("Flutter China Community"));
 }
 
 #[test]
