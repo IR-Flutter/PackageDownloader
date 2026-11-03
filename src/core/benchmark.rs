@@ -22,7 +22,10 @@ impl BenchmarkEngine {
                     mirror_id: mirror.id.clone(),
                     mirror_name: mirror.name.clone(),
                     overall_reachable: false,
+                    partially_reachable: false,
                     average_latency_ms: 0,
+                    quality_score: 0.0,
+                    success_rate: 0.0,
                     probes: vec![BenchmarkProbeResult {
                         provider_id: "http_client".into(),
                         endpoint_url: mirror.website.clone(),
@@ -32,6 +35,8 @@ impl BenchmarkEngine {
                         tcp_ms: None,
                         tls_ms: None,
                         total_latency_ms: 0,
+                        bytes_transferred: None,
+                        throughput_kbps: None,
                         error: Some(e.to_string()),
                     }],
                 };
@@ -43,11 +48,7 @@ impl BenchmarkEngine {
             if dart.enabled {
                 if let Some(ref hosted_url) = dart.hosted_url {
                     let pkg = dart.test_package.as_deref().unwrap_or("http");
-                    let url = format!(
-                        "{}/api/packages/{}",
-                        hosted_url.trim_end_matches('/'),
-                        pkg
-                    );
+                    let url = format!("{}/api/packages/{}", hosted_url.trim_end_matches('/'), pkg);
                     let res = self
                         .probe_endpoint(&client, "dart", &url, Some("name"))
                         .await;
@@ -101,11 +102,18 @@ impl BenchmarkEngine {
             }
         }
 
-        // Compute summary metrics
+        // Compute multi-factor quality scoring metrics
         let total_probes = probes.len();
         let successful_probes: Vec<&BenchmarkProbeResult> =
             probes.iter().filter(|p| p.reachable).collect();
-        let overall_reachable = !successful_probes.is_empty();
+        let overall_reachable = total_probes > 0 && successful_probes.len() == total_probes;
+        let partially_reachable =
+            !successful_probes.is_empty() && successful_probes.len() < total_probes;
+        let success_rate = if total_probes > 0 {
+            successful_probes.len() as f64 / total_probes as f64
+        } else {
+            0.0
+        };
 
         let avg_latency = if !successful_probes.is_empty() {
             let sum: u64 = successful_probes.iter().map(|p| p.total_latency_ms).sum();
@@ -114,19 +122,84 @@ impl BenchmarkEngine {
             0
         };
 
+        // 1. Availability factor (40%): proportion of enabled endpoints that responded
+        let availability_score = success_rate * 100.0;
+
+        // 2. Reliability factor (25%): HTTP 200 without network or content integrity errors
+        let reliable_probes = probes
+            .iter()
+            .filter(|p| p.reachable && p.http_status == Some(200) && p.error.is_none())
+            .count();
+        let reliability_score = if total_probes > 0 {
+            (reliable_probes as f64 / total_probes as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // 3. Latency factor (20%): graduated score based on average response time
+        let latency_score = if successful_probes.is_empty() || avg_latency >= 3000 {
+            0.0
+        } else if avg_latency <= 100 {
+            100.0
+        } else {
+            (1.0 - ((avg_latency - 100) as f64 / 2900.0)) * 100.0
+        };
+
+        // 4. Throughput factor (15%): data transfer rate in KB/s
+        let throughput_sum: f64 = successful_probes
+            .iter()
+            .filter_map(|p| p.throughput_kbps)
+            .sum();
+        let throughput_count = successful_probes
+            .iter()
+            .filter(|p| p.throughput_kbps.is_some())
+            .count();
+        let avg_throughput = if throughput_count > 0 {
+            throughput_sum / throughput_count as f64
+        } else {
+            0.0
+        };
+        let throughput_score = if avg_throughput >= 1000.0 {
+            100.0
+        } else if avg_throughput > 0.0 {
+            (avg_throughput / 1000.0) * 100.0
+        } else {
+            0.0
+        };
+
+        // Multi-factor composite quality score
+        let quality_score = if total_probes == 0 {
+            0.0
+        } else {
+            let raw = (0.40 * availability_score)
+                + (0.25 * reliability_score)
+                + (0.20 * latency_score)
+                + (0.15 * throughput_score);
+            // Penalize partially failing mirrors so they are never treated as 100% healthy
+            if partially_reachable {
+                (raw * success_rate).min(65.0)
+            } else {
+                raw
+            }
+        };
+
         debug!(
-            "Benchmark for {}: {}/{} probes succeeded, avg latency: {}ms",
+            "Benchmark for {}: {}/{} probes succeeded, avg latency: {}ms, quality score: {:.1}",
             mirror.id,
             successful_probes.len(),
             total_probes,
-            avg_latency
+            avg_latency,
+            quality_score
         );
 
         MirrorBenchmarkSummary {
             mirror_id: mirror.id.clone(),
             mirror_name: mirror.name.clone(),
             overall_reachable,
+            partially_reachable,
             average_latency_ms: avg_latency,
+            quality_score,
+            success_rate,
             probes,
         }
     }
@@ -138,10 +211,12 @@ impl BenchmarkEngine {
             summaries.push(self.benchmark_mirror(mirror).await);
         }
 
-        // Sort by quality score (reachable first, then lower average latency)
+        // Sort by quality score (highest composite quality first, then lower average latency)
         summaries.sort_by(|a, b| {
-            b.overall_reachable
-                .cmp(&a.overall_reachable)
+            b.quality_score
+                .partial_cmp(&a.quality_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.overall_reachable.cmp(&a.overall_reachable))
                 .then_with(|| a.average_latency_ms.cmp(&b.average_latency_ms))
         });
 
@@ -164,58 +239,87 @@ impl BenchmarkEngine {
                 let is_http_success = status.is_success();
 
                 if is_http_success {
-                    if let Some(expected) = expected_substring {
-                        match resp.text().await {
-                            Ok(body) if body.contains(expected) => BenchmarkProbeResult {
-                                provider_id: provider_id.to_string(),
-                                endpoint_url: url.to_string(),
-                                reachable: true,
-                                http_status: Some(status.as_u16()),
-                                dns_ms: None,
-                                tcp_ms: None,
-                                tls_ms: None,
-                                total_latency_ms: start.elapsed().as_millis() as u64,
-                                error: None,
-                            },
-                            Ok(_) => BenchmarkProbeResult {
-                                provider_id: provider_id.to_string(),
-                                endpoint_url: url.to_string(),
-                                reachable: false,
-                                http_status: Some(status.as_u16()),
-                                dns_ms: None,
-                                tcp_ms: None,
-                                tls_ms: None,
-                                total_latency_ms: start.elapsed().as_millis() as u64,
-                                error: Some(format!(
-                                    "Payload did not contain expected content '{expected}'"
-                                )),
-                            },
-                            Err(e) => BenchmarkProbeResult {
-                                provider_id: provider_id.to_string(),
-                                endpoint_url: url.to_string(),
-                                reachable: false,
-                                http_status: Some(status.as_u16()),
-                                dns_ms: None,
-                                tcp_ms: None,
-                                tls_ms: None,
-                                total_latency_ms: start.elapsed().as_millis() as u64,
-                                error: Some(e.to_string()),
-                            },
+                    match resp.bytes().await {
+                        Ok(bytes) => {
+                            let total_latency_ms = start.elapsed().as_millis() as u64;
+                            let bytes_len = bytes.len();
+                            let throughput_kbps = if total_latency_ms > 0 {
+                                Some(
+                                    (bytes_len as f64 / 1024.0)
+                                        / (total_latency_ms as f64 / 1000.0),
+                                )
+                            } else {
+                                None
+                            };
+
+                            if let Some(expected) = expected_substring {
+                                let body_text = String::from_utf8_lossy(&bytes);
+                                if body_text.contains(expected) {
+                                    BenchmarkProbeResult {
+                                        provider_id: provider_id.to_string(),
+                                        endpoint_url: url.to_string(),
+                                        reachable: true,
+                                        http_status: Some(status.as_u16()),
+                                        dns_ms: None,
+                                        tcp_ms: None,
+                                        tls_ms: None,
+                                        total_latency_ms,
+                                        bytes_transferred: Some(bytes_len),
+                                        throughput_kbps,
+                                        error: None,
+                                    }
+                                } else {
+                                    BenchmarkProbeResult {
+                                        provider_id: provider_id.to_string(),
+                                        endpoint_url: url.to_string(),
+                                        reachable: false,
+                                        http_status: Some(status.as_u16()),
+                                        dns_ms: None,
+                                        tcp_ms: None,
+                                        tls_ms: None,
+                                        total_latency_ms,
+                                        bytes_transferred: Some(bytes_len),
+                                        throughput_kbps,
+                                        error: Some(format!(
+                                            "Payload did not contain expected content '{expected}'"
+                                        )),
+                                    }
+                                }
+                            } else {
+                                BenchmarkProbeResult {
+                                    provider_id: provider_id.to_string(),
+                                    endpoint_url: url.to_string(),
+                                    reachable: true,
+                                    http_status: Some(status.as_u16()),
+                                    dns_ms: None,
+                                    tcp_ms: None,
+                                    tls_ms: None,
+                                    total_latency_ms,
+                                    bytes_transferred: Some(bytes_len),
+                                    throughput_kbps,
+                                    error: None,
+                                }
+                            }
                         }
-                    } else {
-                        BenchmarkProbeResult {
-                            provider_id: provider_id.to_string(),
-                            endpoint_url: url.to_string(),
-                            reachable: true,
-                            http_status: Some(status.as_u16()),
-                            dns_ms: None,
-                            tcp_ms: None,
-                            tls_ms: None,
-                            total_latency_ms: start.elapsed().as_millis() as u64,
-                            error: None,
+                        Err(e) => {
+                            let total_latency_ms = start.elapsed().as_millis() as u64;
+                            BenchmarkProbeResult {
+                                provider_id: provider_id.to_string(),
+                                endpoint_url: url.to_string(),
+                                reachable: false,
+                                http_status: Some(status.as_u16()),
+                                dns_ms: None,
+                                tcp_ms: None,
+                                tls_ms: None,
+                                total_latency_ms,
+                                bytes_transferred: None,
+                                throughput_kbps: None,
+                                error: Some(e.to_string()),
+                            }
                         }
                     }
                 } else {
+                    let total_latency_ms = start.elapsed().as_millis() as u64;
                     BenchmarkProbeResult {
                         provider_id: provider_id.to_string(),
                         endpoint_url: url.to_string(),
@@ -224,33 +328,45 @@ impl BenchmarkEngine {
                         dns_ms: None,
                         tcp_ms: None,
                         tls_ms: None,
-                        total_latency_ms: start.elapsed().as_millis() as u64,
+                        total_latency_ms,
+                        bytes_transferred: None,
+                        throughput_kbps: None,
                         error: Some(format!("HTTP {}", status)),
                     }
                 }
             }
-            Ok(Err(e)) => BenchmarkProbeResult {
-                provider_id: provider_id.to_string(),
-                endpoint_url: url.to_string(),
-                reachable: false,
-                http_status: None,
-                dns_ms: None,
-                tcp_ms: None,
-                tls_ms: None,
-                total_latency_ms: start.elapsed().as_millis() as u64,
-                error: Some(e.to_string()),
-            },
-            Err(_) => BenchmarkProbeResult {
-                provider_id: provider_id.to_string(),
-                endpoint_url: url.to_string(),
-                reachable: false,
-                http_status: None,
-                dns_ms: None,
-                tcp_ms: None,
-                tls_ms: None,
-                total_latency_ms: timeout.as_millis() as u64,
-                error: Some(format!("Timed out after {}s", self.timeout_secs)),
-            },
+            Ok(Err(e)) => {
+                let total_latency_ms = start.elapsed().as_millis() as u64;
+                BenchmarkProbeResult {
+                    provider_id: provider_id.to_string(),
+                    endpoint_url: url.to_string(),
+                    reachable: false,
+                    http_status: None,
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms,
+                    bytes_transferred: None,
+                    throughput_kbps: None,
+                    error: Some(e.to_string()),
+                }
+            }
+            Err(_) => {
+                let total_latency_ms = timeout.as_millis() as u64;
+                BenchmarkProbeResult {
+                    provider_id: provider_id.to_string(),
+                    endpoint_url: url.to_string(),
+                    reachable: false,
+                    http_status: None,
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms,
+                    bytes_transferred: None,
+                    throughput_kbps: None,
+                    error: Some(format!("Probe timed out after {}s", self.timeout_secs)),
+                }
+            }
         }
     }
 }

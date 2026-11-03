@@ -169,16 +169,26 @@ pub struct BenchmarkProbeResult {
     pub tcp_ms: Option<u64>,
     pub tls_ms: Option<u64>,
     pub total_latency_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bytes_transferred: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub throughput_kbps: Option<f64>,
     pub error: Option<String>,
 }
 
-/// Overall benchmark outcome for a mirror.
+/// Overall benchmark outcome for a mirror with multi-factor quality scoring.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MirrorBenchmarkSummary {
     pub mirror_id: String,
     pub mirror_name: String,
     pub overall_reachable: bool,
+    #[serde(default)]
+    pub partially_reachable: bool,
     pub average_latency_ms: u64,
+    #[serde(default)]
+    pub quality_score: f64,
+    #[serde(default)]
+    pub success_rate: f64,
     pub probes: Vec<BenchmarkProbeResult>,
 }
 

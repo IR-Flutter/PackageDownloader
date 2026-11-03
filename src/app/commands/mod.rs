@@ -32,6 +32,58 @@ pub async fn execute(cli: Cli) -> Result<()> {
     }
 }
 
+/// Cross-platform tool discovery that works on Windows (cmd/powershell/PATHEXT), macOS, and Linux.
+fn is_tool_in_path(tool: &str) -> bool {
+    #[cfg(windows)]
+    {
+        // Try where.exe first
+        if let Ok(output) = std::process::Command::new("where.exe").arg(tool).output() {
+            if output.status.success() {
+                return true;
+            }
+        }
+        // Fallback: inspect PATH with PATHEXT extensions
+        if let Some(path_var) = std::env::var_os("PATH") {
+            let pathext = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+            let extensions: Vec<&str> = pathext.split(';').filter(|s| !s.is_empty()).collect();
+            for dir in std::env::split_paths(&path_var) {
+                if dir.join(tool).is_file() {
+                    return true;
+                }
+                for ext in &extensions {
+                    let full_name = format!("{}{}", tool, ext.to_lowercase());
+                    if dir.join(&full_name).is_file() {
+                        return true;
+                    }
+                    let full_name_upper = format!("{}{}", tool, ext.to_uppercase());
+                    if dir.join(&full_name_upper).is_file() {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+    #[cfg(not(windows))]
+    {
+        // On Unix, try which first
+        if let Ok(output) = std::process::Command::new("which").arg(tool).output() {
+            if output.status.success() {
+                return true;
+            }
+        }
+        // Fallback: directly scan directories in PATH
+        if let Some(path_var) = std::env::var_os("PATH") {
+            for dir in std::env::split_paths(&path_var) {
+                if dir.join(tool).is_file() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
 async fn handle_doctor(storage: &StorageManager, json: bool) -> Result<()> {
     #[derive(serde::Serialize)]
     struct DoctorCheck {
@@ -43,13 +95,9 @@ async fn handle_doctor(storage: &StorageManager, json: bool) -> Result<()> {
 
     let mut checks = Vec::new();
 
-    // 1. Tool availability in PATH
+    // 1. Tool availability in PATH (cross-platform)
     for tool in &["flutter", "dart", "gradle", "javac"] {
-        let in_path = std::process::Command::new("which")
-            .arg(tool)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
+        let in_path = is_tool_in_path(tool);
 
         checks.push(DoctorCheck {
             category: "Environment Tools",
@@ -496,18 +544,35 @@ async fn handle_test(
 
     for s in &summaries {
         let badge = if s.overall_reachable {
-            format!("✅ ONLINE (avg: {}ms)", s.average_latency_ms)
+            format!(
+                "✅ ONLINE (avg: {}ms, score: {:.1})",
+                s.average_latency_ms, s.quality_score
+            )
+        } else if s.partially_reachable {
+            let passed = s.probes.iter().filter(|p| p.reachable).count();
+            format!(
+                "⚠️ PARTIALLY HEALTHY ({}/{} reachable, avg: {}ms, score: {:.1})",
+                passed,
+                s.probes.len(),
+                s.average_latency_ms,
+                s.quality_score
+            )
         } else {
-            "❌ UNREACHABLE".to_string()
+            "❌ OFFLINE / UNREACHABLE".to_string()
         };
 
         println!("🔹 [{}] {} — {}", s.mirror_id, s.mirror_name, badge);
         for p in &s.probes {
             let p_badge = if p.reachable {
+                let speed_str = p
+                    .throughput_kbps
+                    .map(|k| format!(", {:.1} KB/s", k))
+                    .unwrap_or_default();
                 format!(
-                    "{}ms (HTTP {})",
+                    "{}ms (HTTP {}{})",
                     p.total_latency_ms,
-                    p.http_status.unwrap_or(200)
+                    p.http_status.unwrap_or(200),
+                    speed_str
                 )
             } else {
                 format!("FAILED ({})", p.error.as_deref().unwrap_or("unknown error"))
@@ -517,11 +582,25 @@ async fn handle_test(
         println!();
     }
 
-    if let Some(best) = summaries.iter().find(|s| s.overall_reachable) {
-        println!(
-            "💡 Recommended Mirror: [{}] {} (Average Latency: {}ms)",
-            best.mirror_id, best.mirror_name, best.average_latency_ms
-        );
+    // Recommendation logic: prioritize fully reachable mirror with highest quality score.
+    // If none are fully reachable, suggest highest scoring partial mirror with warning.
+    let best = summaries
+        .iter()
+        .find(|s| s.overall_reachable)
+        .or_else(|| summaries.iter().find(|s| s.partially_reachable));
+
+    if let Some(best) = best {
+        if best.overall_reachable {
+            println!(
+                "💡 Recommended Mirror: [{}] {} (Score: {:.1}, Avg Latency: {}ms)",
+                best.mirror_id, best.mirror_name, best.quality_score, best.average_latency_ms
+            );
+        } else {
+            println!(
+                "⚠️ Best Available (Partial): [{}] {} (Score: {:.1}, Avg Latency: {}ms - some endpoints offline)",
+                best.mirror_id, best.mirror_name, best.quality_score, best.average_latency_ms
+            );
+        }
         println!(
             "   To activate this mirror, run: pdown use {}\n",
             best.mirror_id

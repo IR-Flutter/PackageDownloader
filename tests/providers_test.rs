@@ -108,3 +108,62 @@ fn test_ios_provider_guarded() {
         "iOS provider must return an error explaining lack of verified mirrors"
     );
 }
+
+#[test]
+fn test_gradle_provider_real_minimal_project() {
+    let tmp = tempdir().unwrap();
+    let project_dir = tmp.path().join("my_gradle_project");
+    let wrapper_dir = project_dir.join("gradle").join("wrapper");
+    std::fs::create_dir_all(&wrapper_dir).unwrap();
+
+    let build_gradle = project_dir.join("build.gradle");
+    std::fs::write(
+        &build_gradle,
+        "plugins { id 'java' }\nrepositories { mavenCentral() }\n",
+    )
+    .unwrap();
+
+    let settings_gradle = project_dir.join("settings.gradle");
+    std::fs::write(&settings_gradle, "rootProject.name = 'minimal-app'\n").unwrap();
+
+    let wrapper_props = wrapper_dir.join("gradle-wrapper.properties");
+    std::fs::write(
+        &wrapper_props,
+        "distributionBase=GRADLE_USER_HOME\n\
+distributionPath=wrapper/dists\n\
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip\n\
+zipStoreBase=GRADLE_USER_HOME\n\
+zipStorePath=wrapper/dists\n",
+    )
+    .unwrap();
+
+    // Test planning wrapper update
+    let update_item = GradleProvider::plan_wrapper_properties_update(
+        &wrapper_props,
+        "https://maven.myket.ir/gradle/distributions/",
+    )
+    .unwrap()
+    .expect("Must produce wrapper update");
+
+    if let pdown::core::models::ChangeItem::FileWrite { new_content, .. } = &update_item {
+        assert!(new_content.contains(
+            "distributionUrl=https\\://maven.myket.ir/gradle/distributions/gradle-8.5-bin.zip"
+        ));
+        std::fs::write(&wrapper_props, new_content).unwrap();
+    } else {
+        panic!("Expected FileWrite");
+    }
+
+    // Verify revert restores upstream services.gradle.org
+    let revert_item = GradleProvider::plan_wrapper_properties_revert(&wrapper_props)
+        .unwrap()
+        .expect("Must produce revert change");
+
+    if let pdown::core::models::ChangeItem::FileWrite { new_content, .. } = &revert_item {
+        assert!(new_content.contains(
+            "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip"
+        ));
+    } else {
+        panic!("Expected FileWrite on revert");
+    }
+}

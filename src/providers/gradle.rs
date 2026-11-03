@@ -88,8 +88,20 @@ gradle.allprojects {{
 }}
 
 gradle.settingsEvaluated {{ settings ->
-    try {{ settings.pluginManagement.repositories.all {{ rewriteRepo(it) }} }} catch (ignored) {{}}
-    try {{ settings.dependencyResolutionManagement.repositories.all {{ rewriteRepo(it) }} }} catch (ignored) {{}}
+    try {{
+        if (settings.pluginManagement?.repositories) {{
+            settings.pluginManagement.repositories.all {{ rewriteRepo(it) }}
+        }}
+    }} catch (Throwable t) {{
+        logger.info("pdown [Gradle Init]: pluginManagement repositories not accessible: ${{t.message}}")
+    }}
+    try {{
+        if (settings.dependencyResolutionManagement?.repositories) {{
+            settings.dependencyResolutionManagement.repositories.all {{ rewriteRepo(it) }}
+        }}
+    }} catch (Throwable t) {{
+        logger.info("pdown [Gradle Init]: dependencyResolutionManagement repositories not accessible: ${{t.message}}")
+    }}
 }}
 // <<< Managed by pdown [Gradle Mirror] <<<
 "#
@@ -165,6 +177,108 @@ gradle.settingsEvaluated {{ settings ->
 
         let diff = generate_diff(&old_content, &new_content, &path.to_string_lossy());
 
+        Ok(Some(ChangeItem::FileWrite {
+            path: path.to_path_buf(),
+            old_content: Some(old_content),
+            new_content,
+            diff,
+        }))
+    }
+
+    /// Update gradle/wrapper/gradle-wrapper.properties distributionUrl to point to mirror distribution.
+    pub fn plan_wrapper_properties_update(
+        path: &Path,
+        dist_mirror_base: &str,
+    ) -> Result<Option<ChangeItem>> {
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let old_content = fs::read_to_string(path)?;
+        let mut lines: Vec<String> = old_content.lines().map(|s| s.to_string()).collect();
+        let mut modified = false;
+
+        for line in &mut lines {
+            let trimmed = line.trim();
+            if trimmed.starts_with("distributionUrl=") || trimmed.starts_with("distributionUrl =") {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    let current_val = parts[1].trim();
+                    let unescaped = current_val.replace("\\:", ":");
+                    let filename = unescaped.rsplit('/').next().unwrap_or("").trim();
+                    if !filename.is_empty() && filename.ends_with(".zip") {
+                        let new_url =
+                            format!("{}/{}", dist_mirror_base.trim_end_matches('/'), filename);
+                        let escaped_new_url = new_url.replace("://", "\\://");
+                        let new_line = format!("distributionUrl={escaped_new_url}");
+                        if *line != new_line {
+                            *line = new_line;
+                            modified = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if !modified {
+            return Ok(None);
+        }
+
+        let mut new_content = lines.join("\n");
+        if old_content.ends_with('\n') {
+            new_content.push('\n');
+        }
+
+        let diff = generate_diff(&old_content, &new_content, &path.to_string_lossy());
+        Ok(Some(ChangeItem::FileWrite {
+            path: path.to_path_buf(),
+            old_content: Some(old_content),
+            new_content,
+            diff,
+        }))
+    }
+
+    /// Revert gradle/wrapper/gradle-wrapper.properties distributionUrl to upstream services.gradle.org.
+    pub fn plan_wrapper_properties_revert(path: &Path) -> Result<Option<ChangeItem>> {
+        if !path.exists() {
+            return Ok(None);
+        }
+
+        let old_content = fs::read_to_string(path)?;
+        let mut lines: Vec<String> = old_content.lines().map(|s| s.to_string()).collect();
+        let mut modified = false;
+
+        for line in &mut lines {
+            let trimmed = line.trim();
+            if trimmed.starts_with("distributionUrl=") || trimmed.starts_with("distributionUrl =") {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    let current_val = parts[1].trim();
+                    let unescaped = current_val.replace("\\:", ":");
+                    let filename = unescaped.rsplit('/').next().unwrap_or("").trim();
+                    if !filename.is_empty() && filename.ends_with(".zip") {
+                        let upstream_url =
+                            format!("https\\://services.gradle.org/distributions/{filename}");
+                        let new_line = format!("distributionUrl={upstream_url}");
+                        if *line != new_line {
+                            *line = new_line;
+                            modified = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if !modified {
+            return Ok(None);
+        }
+
+        let mut new_content = lines.join("\n");
+        if old_content.ends_with('\n') {
+            new_content.push('\n');
+        }
+
+        let diff = generate_diff(&old_content, &new_content, &path.to_string_lossy());
         Ok(Some(ChangeItem::FileWrite {
             path: path.to_path_buf(),
             old_content: Some(old_content),
@@ -258,10 +372,20 @@ impl Provider for GradleProvider {
         let props_path = Self::gradle_properties_path();
         items.push(Self::plan_properties_update(&props_path)?);
 
+        // 3. Plan updating project gradle/wrapper/gradle-wrapper.properties if present
+        let local_wrapper = Path::new("gradle/wrapper/gradle-wrapper.properties");
+        if local_wrapper.exists() {
+            if let Some(ref dist_url) = gradle_config.distribution_url {
+                if let Some(item) = Self::plan_wrapper_properties_update(local_wrapper, dist_url)? {
+                    items.push(item);
+                }
+            }
+        }
+
         Ok(ChangePlan {
             provider_id: self.id().to_string(),
             description: format!(
-                "Configure Gradle init.d script and properties for mirror '{}'",
+                "Configure Gradle init.d script, properties, and wrapper for mirror '{}'",
                 mirror.id
             ),
             items,
@@ -287,6 +411,14 @@ impl Provider for GradleProvider {
             items.push(item);
         }
 
+        // 3. Revert local wrapper properties if present
+        let local_wrapper = Path::new("gradle/wrapper/gradle-wrapper.properties");
+        if local_wrapper.exists() {
+            if let Some(item) = Self::plan_wrapper_properties_revert(local_wrapper)? {
+                items.push(item);
+            }
+        }
+
         Ok(ChangePlan {
             provider_id: self.id().to_string(),
             description: "Remove managed Gradle init.d script and reset properties".to_string(),
@@ -303,11 +435,56 @@ mod tests {
     fn test_render_init_script_selective_endpoints() {
         let script = GradleProvider::render_init_script(
             Some("https://mirror-maven.runflare.com/maven2/"),
-            None, // Google Maven is NOT mirrored by runflare
+            None,
             None,
         );
         assert!(script.contains("https://mirror-maven.runflare.com/maven2/"));
         assert!(script.contains("def GOOGLE_MAVEN_MIRROR = null"));
         assert!(script.contains("if (MAVEN_CENTRAL_MIRROR &&"));
+        assert!(
+            script.contains("pdown [Gradle Init]: pluginManagement repositories not accessible")
+        );
+    }
+
+    #[test]
+    fn test_gradle_wrapper_properties_update_and_revert() {
+        let tmp = tempfile::tempdir().unwrap();
+        let wrapper_file = tmp.path().join("gradle-wrapper.properties");
+        let initial_content = "distributionBase=GRADLE_USER_HOME\n\
+distributionPath=wrapper/dists\n\
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip\n\
+zipStoreBase=GRADLE_USER_HOME\n\
+zipStorePath=wrapper/dists\n";
+        fs::write(&wrapper_file, initial_content).unwrap();
+
+        // 1. Plan and apply wrapper update
+        let change = GradleProvider::plan_wrapper_properties_update(
+            &wrapper_file,
+            "https://maven.myket.ir/gradle/distributions/",
+        )
+        .unwrap()
+        .expect("ChangeItem must be generated");
+
+        if let ChangeItem::FileWrite { new_content, .. } = change {
+            assert!(new_content.contains(
+                "distributionUrl=https\\://maven.myket.ir/gradle/distributions/gradle-8.5-bin.zip"
+            ));
+            fs::write(&wrapper_file, &new_content).unwrap();
+        } else {
+            panic!("Expected FileWrite");
+        }
+
+        // 2. Plan and apply revert
+        let revert = GradleProvider::plan_wrapper_properties_revert(&wrapper_file)
+            .unwrap()
+            .expect("Revert ChangeItem must be generated");
+
+        if let ChangeItem::FileWrite { new_content, .. } = revert {
+            assert!(new_content.contains(
+                "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip"
+            ));
+        } else {
+            panic!("Expected FileWrite on revert");
+        }
     }
 }

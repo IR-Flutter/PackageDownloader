@@ -67,19 +67,18 @@ impl EnvironmentManager {
         }
 
         // Validate URLs to prevent shell command injection via parameter expansion or subshells
-        if val.starts_with("http://") || val.starts_with("https://") {
-            if val.contains(';')
+        if (val.starts_with("http://") || val.starts_with("https://"))
+            && (val.contains(';')
                 || val.contains('&')
                 || val.contains('|')
                 || val.contains('`')
                 || val.contains('$')
                 || val.contains('(')
-                || val.contains(')')
-            {
-                return Err(crate::core::errors::PdownError::InvalidConfig(format!(
-                    "Suspicious shell metacharacter detected in URL value: '{val}'"
-                )));
-            }
+                || val.contains(')'))
+        {
+            return Err(crate::core::errors::PdownError::InvalidConfig(format!(
+                "Suspicious shell metacharacter detected in URL value: '{val}'"
+            )));
         }
 
         // POSIX single-quote escaping: wrap in '...' and replace every ' with '\''.

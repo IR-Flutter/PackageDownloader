@@ -220,12 +220,18 @@ impl RegistryManager {
         let sig_text = fs::read_to_string(&sig_file)?;
 
         if let Err(e) = verify_signature(&json_bytes, &sig_text, &self.public_key_b64) {
-            warn!("Generation at '{}' failed signature verification: {e}", dir.display());
+            warn!(
+                "Generation at '{}' failed signature verification: {e}",
+                dir.display()
+            );
             return Ok(None);
         }
 
         if let Err(e) = Self::validate_json_schema(&json_bytes) {
-            warn!("Generation at '{}' failed schema validation: {e}", dir.display());
+            warn!(
+                "Generation at '{}' failed schema validation: {e}",
+                dir.display()
+            );
             return Ok(None);
         }
 
@@ -348,7 +354,11 @@ impl RegistryManager {
         fs::write(&staged_meta, serde_json::to_vec_pretty(&meta)?)?;
 
         // Pre-activation verification of staged generation in place
-        if let Err(e) = verify_signature(&fs::read(&staged_json)?, &fs::read_to_string(&staged_sig)?, &self.public_key_b64) {
+        if let Err(e) = verify_signature(
+            &fs::read(&staged_json)?,
+            &fs::read_to_string(&staged_sig)?,
+            &self.public_key_b64,
+        ) {
             let _ = fs::remove_dir_all(&staging_dir);
             return Err(PdownError::SignatureVerification(format!(
                 "Staged generation failed signature verification: {e}"
@@ -361,7 +371,11 @@ impl RegistryManager {
 
         // Also atomically update standard cached registry and signature paths
         atomic_write_bytes(&self.storage.cached_registry_path(), &raw_bytes, None)?;
-        atomic_write_bytes(&self.storage.cached_signature_path(), remote_sig.trim().as_bytes(), None)?;
+        atomic_write_bytes(
+            &self.storage.cached_signature_path(),
+            remote_sig.trim().as_bytes(),
+            None,
+        )?;
 
         // Update persistent state tracking
         let new_state = PersistentRegistryState {
@@ -467,8 +481,9 @@ impl RegistryManager {
     pub fn validate_json_schema(raw_json: &[u8]) -> Result<()> {
         let json_val: serde_json::Value = serde_json::from_slice(raw_json)?;
         let schema_val: serde_json::Value = serde_json::from_str(REGISTRY_SCHEMA_JSON)?;
-        let validator = jsonschema::validator_for(&schema_val)
-            .map_err(|e| PdownError::RegistryValidation(format!("Invalid embedded JSON schema: {e}")))?;
+        let validator = jsonschema::validator_for(&schema_val).map_err(|e| {
+            PdownError::RegistryValidation(format!("Invalid embedded JSON schema: {e}"))
+        })?;
 
         if let Err(err) = validator.validate(&json_val) {
             return Err(PdownError::RegistryValidation(format!(
