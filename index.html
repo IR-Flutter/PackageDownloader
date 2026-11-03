@@ -194,9 +194,9 @@ td.ltr{text-align:left;word-break:break-all}tbody tr:hover td{background:none}
 <header class="hero" id="top"><div class="wrap">
 <div class="hgrid">
 <div>
-<div class="badge"><span class="dot"></span>نسخه ۱.۱.۰ — سبک، پایدار و کاملاً رایگان</div>
+<div class="badge"><span class="dot"></span>نسخه ۲.۰.۰ (Rust) — فوق‌سریع، امن و تراکنشی</div>
 <h1>مدیریت هوشمند میرورهای فلاتر، دارت و <em>اندروید گریدل</em></h1>
-<p class="lead">ابزار خط فرمان فوق‌سریع <code>irflutter</code> برای انتخاب خودکار بهینه‌ترین میرور، دور زدن تحریم‌های توسعه نرم‌افزار و شتاب‌بخشی به بیلد و دانلود پکیج‌ها در ایران.</p>
+<p class="lead">ابزار بومی و فوق‌سریع خط فرمان <code>pdown</code> (با پشتیبانی کامل از نام مستعار <code>irflutter</code>) برای انتخاب خودکار بهینه‌ترین میرور، دور زدن تحریم‌های توسعه نرم‌افزار و شتاب‌بخشی به بیلد و دانلود پکیج‌ها در ایران با تضمین رول‌بک و رجیستری امضاشده.</p>
 <div class="ctas">
 <a class="btn b1" href="#install"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8z"/></svg>نصب سریع با یک دستور</a>
 <a class="btn b2" href="#table">مشاهده لیست میرورها</a>
@@ -276,12 +276,12 @@ const RES=[['pub-azs',48],['runflare',63],['iranserver',91],['jamko',120],['ito'
 async function type(el,txt,id){for(const ch of txt){if(id!==run)return;el.textContent+=ch;await sleep(reduce?0:38)}}
 async function play(){const id=++run;TB.innerHTML='';
  const line=h=>{const d=document.createElement('div');d.innerHTML=h;TB.append(d);return d};
- let d=line('<span class="p">$</span> <span></span><span class="caret"></span>');await type(d.children[1],'irflutter test',id);if(id!==run)return;d.querySelector('.caret').remove();await sleep(reduce?0:350);
+ let d=line('<span class="p">$</span> <span></span><span class="caret"></span>');await type(d.children[1],'pdown test',id);if(id!==run)return;d.querySelector('.caret').remove();await sleep(reduce?0:350);
  for(const [n,ms] of RES){if(id!==run)return;const r=line(`<div class="trow"><span>${n}</span><div class="bar"><i></i></div><span class="dim">${ms}ms</span>${n==='pub-azs'?'<span class="fast">سریع‌ترین</span>':'<span></span>'}</div>`);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{r.querySelector('i').style.width=Math.max(12,100-ms*.55)+'%'}));await sleep(reduce?0:260)}
  await sleep(reduce?0:600);if(id!==run)return;TB.append(document.createElement('br'));
- d=line('<span class="p">$</span> <span></span><span class="caret"></span>');await type(d.children[1],'irflutter use pub-azs',id);if(id!==run)return;d.querySelector('.caret').remove();await sleep(reduce?0:350);
- line('<span class="ok">✓</span> PUB_HOSTED_URL → https://pub-azs.ir');await sleep(reduce?0:300);line('<span class="ok">✓</span> ~/.gradle/init.gradle updated');}
+ d=line('<span class="p">$</span> <span></span><span class="caret"></span>');await type(d.children[1],'pdown use pub-azs',id);if(id!==run)return;d.querySelector('.caret').remove();await sleep(reduce?0:350);
+ line('<span class="ok">✓</span> Backed up dotfiles (SHA-256)');await sleep(reduce?0:200);line('<span class="ok">✓</span> PUB_HOSTED_URL → https://pub-azs.ir');await sleep(reduce?0:200);line('<span class="ok">✓</span> ~/.gradle/init.d/pdown-mirror.gradle created');}
 $('#replay').onclick=play;
 new IntersectionObserver((es,o)=>{if(es[0].isIntersecting){o.disconnect();play()}},{threshold:.3}).observe(TB);
 
@@ -298,9 +298,9 @@ setTab(OS==='win'?'win':'unix');
 
 /* featured */
 const F=[
- {n:'PUB-AZS',m:'PA',s:'سرویس جامع جامعهٔ متن‌باز',tg:[['t-full','فلاتر + دارت + گریدل'],['t-flutter','pub.dev'],['t-gradle','Maven Central']],u:[['Dart/Flutter','https://pub-azs.ir'],['Gradle/Maven','https://pub-azs.ir/api/mavens/']],c:'irflutter use pub-azs',big:1},
- {n:'Runflare (رن‌فلر)',m:'RF',s:'زیرساخت ابری پرسرعت',tg:[['t-full','فلاتر + دارت + گریدل'],['t-flutter','Flutter Storage'],['t-gradle','Maven2']],u:[['Dart/Flutter','mirror-flutter.runflare.com'],['Gradle/Maven','mirror-maven.runflare.com']],c:'irflutter use runflare'},
- {n:'Jamko / Chrepo',m:'JK',s:'تخصصی اندروید و گریدل',tg:[['t-gradle','Android Gradle'],['t-maven','Maven Dependencies']],u:[['Gradle','https://gradle.chrepo.ir'],['Flutter/Dart','Official Google CDN']],c:'irflutter use-gradle jamko'}];
+ {n:'PUB-AZS',m:'PA',s:'جامعهٔ توسعه‌دهندگان آزاد ایران',tg:[['t-full','دارت + گریدل'],['t-flutter','pub.dev'],['t-gradle','Maven & Google Maven']],u:[['Dart Pub','https://pub-azs.ir'],['Gradle/Maven','https://pub-azs.ir/api/mavens/']],c:'pdown use pub-azs',big:1},
+ {n:'Runflare (رن‌فلر)',m:'RF',s:'زیرساخت ابری پرسرعت',tg:[['t-full','فلاتر + دارت + گریدل'],['t-flutter','Flutter SDK Storage'],['t-gradle','Maven Central']],u:[['Flutter Storage','mirror-gcs.runflare.com'],['Dart Pub','mirror-flutter.runflare.com']],c:'pdown use runflare'},
+ {n:'Jamko / Chrepo',m:'JK',s:'تخصصی اندروید و گریدل',tg:[['t-gradle','Android Gradle'],['t-maven','Google & Maven Central']],u:[['Gradle','https://gradle.chrepo.ir'],['Flutter/Dart','Official Google CDN']],c:'pdown use jamko --ecosystem gradle'}];
 $('#fgrid').innerHTML=F.map(f=>`<article class="card${f.big?' big':''}"><div><div class="ch"><div class="av">${f.m}</div><div><h3>${f.n}</h3><div class="sub">${f.s}</div></div><span class="st">فعال و پایدار</span></div>
 <div class="tags" style="margin-top:16px">${f.tg.map(t=>`<span class="tag ${t[0]}">${t[1]}</span>`).join('')}</div></div>
 <div class="urls">${f.u.map(u=>`<div><span>${u[0]}</span><span>${u[1]}</span></div>`).join('')}</div>
@@ -308,13 +308,13 @@ $('#fgrid').innerHTML=F.map(f=>`<article class="card${f.big?' big':''}"><div><di
 
 /* table */
 const T=[
- ['PUB-AZS','جامعه برنامه‌نویسان آزاد','flutter gradle','t-full','فلاتر + دارت + گریدل','https://pub-azs.ir','https://pub-azs.ir/api/mavens/','irflutter use pub-azs','pub-azs azs'],
- ['Runflare','رن‌فلر کلود','flutter gradle','t-full','فلاتر + دارت + گریدل','https://mirror-flutter.runflare.com','https://mirror-maven.runflare.com/maven2/','irflutter use runflare','runflare رن‌فلر رن فلر'],
- ['Jamko / Chrepo','جامکو مخزن اندروید','gradle','t-gradle','گریدل + ماون','مخازن رسمی گوگل','https://gradle.chrepo.ir','irflutter use-gradle jamko','jamko chrepo جامکو چریپو'],
- ['IranServer','ایران‌سرور دیتاسنتر','gradle','t-maven','ماون سنترال','مخازن رسمی گوگل','https://maven.iranserver.com/repository/maven/','irflutter use-gradle iranserver','iranserver ایران سرور ایران‌سرور'],
- ['ITO National','سازمان فناوری اطلاعات ایران','gradle','t-gradle','ماون + گریدل ملی','مخازن رسمی گوگل','https://archive.ito.gov.ir/gradle/maven_central/','irflutter use-gradle ito','ito national سازمان فناوری اطلاعات'],
- ['Flutter Community (CN)','جامعه بین‌المللی فلاتر چین','flutter','t-flutter','فلاتر و دارت','https://pub.flutter-io.cn','—','irflutter use-flutter flutter-cn','flutter community cn چین flutter-cn'],
- ['Google Official','مخازن رسمی گوگل (بدون میرور)','flutter gradle','','پیش‌فرض','https://pub.dev','Maven Central رسمی','irflutter reset','official google reset گوگل پیش‌فرض اصلی']];
+ ['PUB-AZS','جامعه برنامه‌نویسان آزاد','flutter gradle','t-full','دارت + گریدل + ماون','https://pub-azs.ir','https://pub-azs.ir/api/mavens/','pdown use pub-azs','pub-azs azs'],
+ ['Runflare','رن‌فلر کلود','flutter gradle','t-full','فلاتر + دارت + ماون۲','https://mirror-flutter.runflare.com','https://mirror-maven.runflare.com/maven2/','pdown use runflare','runflare رن‌فلر رن فلر'],
+ ['Jamko / Chrepo','جامکو مخزن اندروید','gradle','t-gradle','گریدل + ماون + گوگل','مخازن رسمی گوگل','https://gradle.chrepo.ir','pdown use jamko --ecosystem gradle','jamko chrepo جامکو چریپو'],
+ ['IranServer','ایران‌سرور دیتاسنتر','gradle','t-maven','ماون سنترال','مخازن رسمی گوگل','https://maven.iranserver.com/repository/maven/','pdown use iranserver --ecosystem gradle','iranserver ایران سرور ایران‌سرور'],
+ ['ITO National','سازمان فناوری اطلاعات ایران','gradle','t-gradle','ماون + گریدل ملی','مخازن رسمی گوگل','https://archive.ito.gov.ir/gradle/maven_central/','pdown use ito --ecosystem gradle','ito national سازمان فناوری اطلاعات'],
+ ['Flutter Community (CN)','جامعه بین‌المللی فلاتر چین','flutter','t-flutter','فلاتر و دارت','https://pub.flutter-io.cn','—','pdown use flutter-cn --ecosystem flutter','flutter community cn چین flutter-cn'],
+ ['Google Official','مخازن رسمی گوگل (بدون میرور)','flutter gradle','','پیش‌فرض','https://pub.dev','Maven Central رسمی','pdown reset','official google reset گوگل پیش‌فرض اصلی']];
 const cell=u=>/^https?:/.test(u)?`<a href="${u}" target="_blank" rel="noopener">${u.replace(/^https?:\/\//,'').replace(/\/$/,'')}</a>`:u;
 $('#tb').innerHTML=T.map(r=>`<tr data-t="${r[2]}" data-s="${r[8]}"><td data-l="سرویس‌دهنده"><span><strong>${r[0]}</strong><small>${r[1]}</small></span></td><td data-l="پوشش"><span class="tag ${r[3]}">${r[4]}</span></td><td class="ltr" data-l="Flutter">${cell(r[5])}</td><td class="ltr" data-l="Gradle">${cell(r[6])}</td><td data-l="دستور"><div class="mini" style="min-width:0"><span>${r[7]}</span>${ic(r[7])}</div></td></tr>`).join('');
 let flt='all',qs='';
@@ -326,14 +326,23 @@ $('#clear').onclick=()=>{$('#q').value='';qs='';$$('#chips .chip')[0].click()};
 /* downloads */
 const R='https://github.com/IR-Flutter/PackageDownloader/releases/latest/download/';
 const WIN='<path d="M0 3.449 9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>',APL='<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8.92-2.85-.9.04-2 .6-2.65 1.35-.58.67-1.09 1.74-.95 2.77 1.01.08 2.06-.52 2.68-1.27z"/>',LNX='<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm2.7 4.3-1.4 1.4 2.3 2.3-2.3 2.3 1.4 1.4 3.7-3.7zM12 15h6v-2h-6z"/>';
-const D=[['win','Windows','x64 (64-bit)',WIN,'فایل اجرایی مستقل <code>irflutter.exe</code> برای ویندوز ۱۰ و ۱۱ بدون نیاز به ابزار کمکی.','irflutter-windows-x64.exe','دانلود برای Windows'],
- ['mac','macOS Apple Silicon','ARM64 (M1 / M2 / M3 / M4)',APL,'کامپایل اختصاصی برای مک‌های مجهز به تراشه‌های اپل سیلیکون سری M.','irflutter-macos-arm64','دانلود مک Apple Silicon'],
- ['mac','macOS Intel','x64 (Intel 64-bit)',APL,'نسخهٔ نیتیو سازگار با مک‌بوک‌ها و آی‌مک‌های نسل اینتل.','irflutter-macos-x64','دانلود مک Intel'],
- ['linux','Linux','x64 (GLIBC 2.27+)',LNX,'سازگار با Ubuntu، Debian، Arch، Fedora، openSUSE و سرورهای CI/CD.','irflutter-linux-x64','دانلود لینوکس']];
-$('#dgrid').innerHTML=D.map(d=>`<article class="dl${d[0]===OS?' me':''}">${d[0]===OS?'<span class="me-b">سیستم شما</span>':''}<div class="pi"><svg viewBox="0 0 24 24" aria-hidden="true">${d[3]}</svg></div><div><h3>${d[1]}</h3><div class="ar">${d[2]}</div></div><p>${d[4]}</p><a class="btn b2" href="${R+d[5]}">${d[6]} · v1.1.0</a></article>`).join('');
+const D=[['win','Windows','x64 (64-bit)',WIN,'فایل اجرایی مستقل <code>pdown-windows-x64.exe</code> بدون نیاز به ابزار کمکی.','pdown-windows-x64.exe','دانلود برای Windows'],
+ ['mac','macOS Apple Silicon','ARM64 (M1 / M2 / M3 / M4)',APL,'کامپایل اختصاصی و بهینه‌سازی‌شده برای مک‌های اپل سیلیکون سری M.','pdown-macos-arm64','دانلود مک Apple Silicon'],
+ ['mac','macOS Intel','x64 (Intel 64-bit)',APL,'نسخهٔ نیتیو سازگار با مک‌بوک‌ها و آی‌مک‌های نسل اینتل.','pdown-macos-x64','دانلود مک Intel'],
+ ['linux','Linux','x64 (GLIBC 2.27+)',LNX,'سازگار با Ubuntu، Debian، Arch، Fedora، openSUSE و سرورهای CI/CD.','pdown-linux-x64','دانلود لینوکس']];
+$('#dgrid').innerHTML=D.map(d=>`<article class="dl${d[0]===OS?' me':''}">${d[0]===OS?'<span class="me-b">سیستم شما</span>':''}<div class="pi"><svg viewBox="0 0 24 24" aria-hidden="true">${d[3]}</svg></div><div><h3>${d[1]}</h3><div class="ar">${d[2]}</div></div><p>${d[4]}</p><a class="btn b2" href="${R+d[5]}">${d[6]} · v2.0.0</a></article>`).join('');
 
 /* cli */
-const C=[['irflutter list','نمایش فهرست کامل میرورهای فعال به همراه نوع پوشش و آدرس اندپوینت‌ها.'],['irflutter test','تست زندهٔ پینگ و تأخیر همهٔ میرورها و رتبه‌بندی سریع‌ترین سرور در شبکهٔ شما.'],['irflutter use pub-azs','فعال‌سازی همزمان میرور برای متغیرهای محیطی فلاتر/دارت و کانفیگ گریدل با یک فرمان.'],['irflutter use-gradle jamko','تنظیم مخزن بیلد گریدل اندروید در <code>~/.gradle/init.gradle</code> بدون تغییر مخزن فلاتر.'],['irflutter use-flutter flutter-cn','تنظیم متغیرهای <code>PUB_HOSTED_URL</code> و <code>FLUTTER_STORAGE_BASE_URL</code> برای دانلود پکیج‌های pub.dev.'],['irflutter reset','حذف همهٔ تنظیمات میرور و بازگردانی کانفیگ‌ها به مخازن اصلی گوگل و Maven Central.'],['irflutter status','مشاهدهٔ وضعیت جاری متغیرهای شل، فایل کانفیگ گریدل و میرورهای فعال روی سیستم.']];
+const C=[
+ ['pdown list','نمایش فهرست کامل میرورهای فعال، رتبه‌بندی، نسخهٔ رجیستری و آدرس اندپوینت‌ها.'],
+ ['pdown test','بنچ‌مارک چندمرحله‌ای واقعی شامل پینگ، TTFB، تأخیر دانلود و رتبه‌بندی سریع‌ترین میرور.'],
+ ['pdown use pub-azs','فعال‌سازی هوشمند و تراکنشی میرور برای اکوسیستم‌های پشتیبانی‌شده به همراه بک‌آپ امن.'],
+ ['pdown use jamko --ecosystem gradle','فعال‌سازی اختصاصی مخزن گریدل اندروید در <code>~/.gradle/init.d/pdown-mirror.gradle</code>.'],
+ ['pdown doctor','بررسی سلامت کامل سیستم، اعتبارسنجی رجیستری Ed25519، متغیرهای شل و دسترسی به اینترنت.'],
+ ['pdown profile iran','تغییر فوری تمام تنظیمات به پروفایل بهینهٔ توسعه‌دهندگان در ایران.'],
+ ['pdown reset','حذف ایمن تمام کانفیگ‌های میرور و بازگردانی تضمینی به مخازن اصلی گوگل و Maven Central.'],
+ ['pdown status','مشاهده وضعیت جاری متغیرهای محیطی، فایل‌های کانفیگ، پشتیبان‌ها و میرور فعال.']
+];
 $('#cligrid').innerHTML=C.map(c=>`<div class="row${c[0].endsWith('reset')?' rst':''}"><div class="cmd"><code>${c[0]}</code>${ic(c[0])}</div><p>${c[1]}</p></div>`).join('');
 </script>
 </body>
