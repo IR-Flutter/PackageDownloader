@@ -41,6 +41,13 @@ pub enum PdownError {
     #[error("Transaction failed: {0}")]
     TransactionFailed(String),
 
+    #[error("Transaction failed: {transaction_error}. Rollback ALSO failed: {rollback_errors:?}. Recovery advice: {recovery_advice}")]
+    TransactionAndRollbackFailed {
+        transaction_error: String,
+        rollback_errors: Vec<String>,
+        recovery_advice: String,
+    },
+
     #[error("Backup failure for path {path}: {message}")]
     BackupFailed { path: PathBuf, message: String },
 
@@ -62,7 +69,9 @@ impl PdownError {
             PdownError::Http(_) => 5,
             PdownError::SignatureVerification(_) => 6,
             PdownError::SchemaMismatch { .. } | PdownError::RollbackRejected { .. } => 6,
-            PdownError::TransactionFailed(_) | PdownError::RollbackFailed(_) => 7,
+            PdownError::TransactionFailed(_)
+            | PdownError::TransactionAndRollbackFailed { .. }
+            | PdownError::RollbackFailed(_) => 7,
             PdownError::InvalidConfig(_) => 2,
             _ => 1,
         }

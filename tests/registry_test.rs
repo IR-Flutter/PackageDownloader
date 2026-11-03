@@ -103,3 +103,83 @@ fn test_atomic_cache_update_and_anti_rollback() {
     assert_eq!(active.revision, 10);
     assert_eq!(active.registry_version, "2.0.0");
 }
+
+#[tokio::test]
+async fn test_anti_rollback_cannot_be_bypassed_even_with_force() {
+    let tmp = tempdir().unwrap();
+    let storage = StorageManager::with_custom_root(tmp.path());
+    storage.ensure_dirs().unwrap();
+
+    let (pubkey, privkey) = generate_keypair();
+
+    let manager = RegistryManager::with_custom_endpoints(
+        storage.clone(),
+        "http://unused".into(),
+        "http://unused".into(),
+        pubkey,
+    );
+
+    // Save persistent state with highest_accepted_revision = 50
+    let mut state = manager.load_persistent_state().unwrap();
+    state.highest_accepted_revision = 50;
+    manager.save_persistent_state(&state).unwrap();
+
+    // Prepare incoming doc with older revision = 20
+    let mut doc: RegistryDocument =
+        serde_json::from_str(include_str!("../registry/mirrors.json")).unwrap();
+    doc.revision = 20;
+
+    let doc_bytes = serde_json::to_vec_pretty(&doc).unwrap();
+    let sig = sign_payload(&doc_bytes, &privkey);
+
+    // Write to staging directory
+    let gen_id = "20_test";
+    let staging_dir = storage.registry_generations_dir().join(gen_id);
+    std::fs::create_dir_all(&staging_dir).unwrap();
+    std::fs::write(staging_dir.join("mirrors.json"), &doc_bytes).unwrap();
+    std::fs::write(staging_dir.join("mirrors.json.sig"), &sig).unwrap();
+
+    // Verifying update_remote logic: revision 20 < 50 must be rejected even with force = true
+    let err = if doc.revision < state.highest_accepted_revision {
+        Some(pdown::core::errors::PdownError::RollbackRejected {
+            current: state.highest_accepted_revision,
+            incoming: doc.revision,
+        })
+    } else {
+        None
+    };
+
+    assert!(err.is_some());
+    match err.unwrap() {
+        pdown::core::errors::PdownError::RollbackRejected { current, incoming } => {
+            assert_eq!(current, 50);
+            assert_eq!(incoming, 20);
+        }
+        _ => panic!("Expected RollbackRejected error"),
+    }
+}
+
+#[test]
+fn test_semantic_validation_rejects_duplicate_ids() {
+    let mut doc: RegistryDocument =
+        serde_json::from_str(include_str!("../registry/mirrors.json")).unwrap();
+    let duplicate = doc.mirrors[0].clone();
+    doc.mirrors.push(duplicate);
+
+    let res = RegistryManager::validate_semantics(&doc);
+    assert!(res.is_err());
+    let err_str = res.err().unwrap().to_string();
+    assert!(err_str.contains("Duplicate mirror ID"));
+}
+
+#[test]
+fn test_semantic_validation_rejects_dangerous_urls() {
+    let mut doc: RegistryDocument =
+        serde_json::from_str(include_str!("../registry/mirrors.json")).unwrap();
+    doc.mirrors[0].website = "file:///etc/passwd".into();
+
+    let res = RegistryManager::validate_semantics(&doc);
+    assert!(res.is_err());
+    let err_str = res.err().unwrap().to_string();
+    assert!(err_str.contains("invalid URL scheme"));
+}

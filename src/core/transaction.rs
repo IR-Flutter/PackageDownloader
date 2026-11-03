@@ -81,11 +81,25 @@ impl TransactionEngine {
                     "Provider '{}' failed during configuration: {e}. Initiating rollback.",
                     plan.provider_id
                 );
-                self.unwind_rollback(rollback_stack);
-                return Err(PdownError::TransactionFailed(format!(
-                    "Transaction aborted due to failure in provider '{}': {e}",
-                    plan.provider_id
-                )));
+                let rollback_errors = self.unwind_rollback(rollback_stack);
+                if rollback_errors.is_empty() {
+                    return Err(PdownError::TransactionFailed(format!(
+                        "Transaction aborted due to failure in provider '{}': {e}. All changes were cleanly rolled back.",
+                        plan.provider_id
+                    )));
+                } else {
+                    return Err(PdownError::TransactionAndRollbackFailed {
+                        transaction_error: format!(
+                            "Transaction aborted due to failure in provider '{}': {e}",
+                            plan.provider_id
+                        ),
+                        rollback_errors,
+                        recovery_advice: format!(
+                            "Manual rollback required. File snapshots are preserved in backup directory '{}'.",
+                            self.backup_manager.backup_dir().display()
+                        ),
+                    });
+                }
             }
             report.successful_providers.push(plan.provider_id);
         }
@@ -135,16 +149,19 @@ impl TransactionEngine {
         Ok(())
     }
 
-    fn unwind_rollback(&self, mut stack: Vec<RollbackAction>) {
+    fn unwind_rollback(&self, mut stack: Vec<RollbackAction>) -> Vec<String> {
         warn!("Unwinding {} rollback actions...", stack.len());
+        let mut rollback_errors = Vec::new();
         while let Some(action) = stack.pop() {
             match action {
                 RollbackAction::RestoreBackup(record) => {
                     if let Err(e) = self.backup_manager.restore(&record) {
-                        error!(
+                        let err_msg = format!(
                             "Failed to restore backup for '{}': {e}",
                             record.original_path.display()
                         );
+                        error!("{err_msg}");
+                        rollback_errors.push(err_msg);
                     } else {
                         info!("Restored snapshot for '{}'", record.original_path.display());
                     }
@@ -152,10 +169,12 @@ impl TransactionEngine {
                 RollbackAction::DeleteCreatedFile(path) => {
                     if path.exists() {
                         if let Err(e) = fs::remove_file(&path) {
-                            error!(
+                            let err_msg = format!(
                                 "Failed to remove created file during rollback '{}': {e}",
                                 path.display()
                             );
+                            error!("{err_msg}");
+                            rollback_errors.push(err_msg);
                         } else {
                             info!(
                                 "Removed newly created file '{}' during rollback",
@@ -166,6 +185,7 @@ impl TransactionEngine {
                 }
             }
         }
+        rollback_errors
     }
 }
 

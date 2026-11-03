@@ -12,19 +12,33 @@ pub fn generate_diff(old: &str, new: &str, label: &str) -> String {
         .to_string()
 }
 
-/// Atomically write content to a file using temporary file and atomic rename.
-pub fn atomic_write(path: &Path, content: &str) -> std::io::Result<()> {
+/// Atomically write bytes to a file using a temporary file and atomic rename.
+pub fn atomic_write_bytes(
+    path: &Path,
+    bytes: &[u8],
+    permissions: Option<fs::Permissions>,
+) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
 
     let parent_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let mut temp = NamedTempFile::new_in(parent_dir)?;
-    temp.write_all(content.as_bytes())?;
+    temp.write_all(bytes)?;
     temp.flush()?;
+
+    if let Some(perms) = permissions {
+        let _ = fs::set_permissions(temp.path(), perms);
+    }
+
     temp.persist(path)
         .map_err(|e| std::io::Error::other(e.to_string()))?;
     Ok(())
+}
+
+/// Atomically write content string to a file using temporary file and atomic rename.
+pub fn atomic_write(path: &Path, content: &str) -> std::io::Result<()> {
+    atomic_write_bytes(path, content.as_bytes(), None)
 }
 
 #[cfg(test)]

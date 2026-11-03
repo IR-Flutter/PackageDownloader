@@ -13,6 +13,7 @@ pub struct BackupRecord {
     pub original_path: PathBuf,
     pub backup_path: PathBuf,
     pub sha256_hash: String,
+    pub permissions_mode: Option<u32>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -32,6 +33,10 @@ impl BackupManager {
         Self { backup_dir }
     }
 
+    pub fn backup_dir(&self) -> &Path {
+        &self.backup_dir
+    }
+
     /// Backup a file before modification. Returns BackupRecord if file existed.
     pub fn backup_file(&self, file_path: &Path) -> Result<Option<BackupRecord>> {
         if !file_path.exists() {
@@ -40,6 +45,7 @@ impl BackupManager {
 
         fs::create_dir_all(&self.backup_dir)?;
 
+        let metadata = fs::metadata(file_path)?;
         let content = fs::read(file_path)?;
         let mut hasher = Sha256::new();
         hasher.update(&content);
@@ -56,16 +62,25 @@ impl BackupManager {
 
         fs::copy(file_path, &backup_path)?;
 
+        #[cfg(unix)]
+        let permissions_mode = {
+            use std::os::unix::fs::PermissionsExt;
+            Some(metadata.permissions().mode())
+        };
+        #[cfg(not(unix))]
+        let permissions_mode = None;
+
         Ok(Some(BackupRecord {
             id,
             original_path: file_path.to_path_buf(),
             backup_path,
             sha256_hash: hash,
+            permissions_mode,
             created_at: Utc::now(),
         }))
     }
 
-    /// Restore a file from its backup record.
+    /// Restore a file from its backup record. Byte-preserving and permission-retaining.
     pub fn restore(&self, record: &BackupRecord) -> Result<()> {
         if !record.backup_path.exists() {
             return Err(PdownError::BackupFailed {
@@ -95,9 +110,18 @@ impl BackupManager {
             fs::create_dir_all(parent)?;
         }
 
-        crate::system::filesystem::atomic_write(
+        #[cfg(unix)]
+        let permissions = record.permissions_mode.map(|mode| {
+            use std::os::unix::fs::PermissionsExt;
+            fs::Permissions::from_mode(mode)
+        });
+        #[cfg(not(unix))]
+        let permissions = None;
+
+        crate::system::filesystem::atomic_write_bytes(
             &record.original_path,
-            &String::from_utf8_lossy(&content),
+            &content,
+            permissions,
         )?;
 
         Ok(())

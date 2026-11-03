@@ -57,26 +57,39 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "📥 Downloading $BIN_NAME ($TARGET) from $DOWNLOAD_URL..."
-curl -sSL "$DOWNLOAD_URL" -o "$TMP_DIR/$BIN_NAME"
+curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/$BIN_NAME"
 
-echo "🔒 Verifying SHA-256 cryptographic checksum..."
-if curl -sSL -f "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt"; then
-  EXPECTED_SHA=$(grep "$BIN_NAME-$TARGET" "$TMP_DIR/checksums.txt" | awk '{print $1}')
-  if [ -n "$EXPECTED_SHA" ]; then
-    if command -v sha256sum >/dev/null 2>&1; then
-      ACTUAL_SHA=$(sha256sum "$TMP_DIR/$BIN_NAME" | awk '{print $1}')
-    else
-      ACTUAL_SHA=$(shasum -a 256 "$TMP_DIR/$BIN_NAME" | awk '{print $1}')
-    fi
+echo "🔒 Verifying SHA-256 cryptographic checksum (fail-closed)..."
+if ! curl -fsSL "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt"; then
+  echo "❌ Failed to download release checksums file from $CHECKSUM_URL"
+  echo "   Installation aborted to protect system integrity."
+  exit 1
+fi
 
-    if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
-      echo "❌ Checksum verification failed!"
-      echo "   Expected: $EXPECTED_SHA"
-      echo "   Actual:   $ACTUAL_SHA"
-      exit 1
-    fi
-    echo "✅ Checksum verified: $ACTUAL_SHA"
-  fi
+EXPECTED_SHA=$(grep "$BIN_NAME-$TARGET" "$TMP_DIR/checksums.txt" | awk '{print $1}')
+if [ -z "$EXPECTED_SHA" ]; then
+  echo "❌ Checksum for $BIN_NAME-$TARGET not found in checksums.txt"
+  echo "   Installation aborted."
+  exit 1
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL_SHA=$(sha256sum "$TMP_DIR/$BIN_NAME" | awk '{print $1}')
+else
+  ACTUAL_SHA=$(shasum -a 256 "$TMP_DIR/$BIN_NAME" | awk '{print $1}')
+fi
+
+if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+  echo "❌ Checksum verification failed!"
+  echo "   Expected: $EXPECTED_SHA"
+  echo "   Actual:   $ACTUAL_SHA"
+  exit 1
+fi
+echo "✅ SHA-256 Checksum verified: $ACTUAL_SHA"
+
+if [ ! -s "$TMP_DIR/$BIN_NAME" ]; then
+  echo "❌ Downloaded binary is empty. Installation aborted."
+  exit 1
 fi
 
 chmod +x "$TMP_DIR/$BIN_NAME"

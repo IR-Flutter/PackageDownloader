@@ -71,12 +71,21 @@ impl StorageManager {
         self.cache_dir.join("mirrors.json.sig")
     }
 
+    pub fn registry_state_path(&self) -> PathBuf {
+        self.data_dir.join("registry_state.json")
+    }
+
+    pub fn registry_generations_dir(&self) -> PathBuf {
+        self.cache_dir.join("generations")
+    }
+
     pub fn ensure_dirs(&self) -> Result<()> {
         fs::create_dir_all(&self.config_dir)?;
         fs::create_dir_all(&self.data_dir)?;
         fs::create_dir_all(&self.cache_dir)?;
         fs::create_dir_all(self.backup_dir())?;
         fs::create_dir_all(self.profiles_dir())?;
+        fs::create_dir_all(self.registry_generations_dir())?;
         Ok(())
     }
 }

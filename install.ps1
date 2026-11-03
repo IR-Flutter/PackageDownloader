@@ -33,21 +33,29 @@ $TempChecksum = Join-Path $TempDir "checksums.txt"
 Write-Host "📥 Downloading binary from $DownloadUrl ..." -ForegroundColor Yellow
 Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempFile
 
-# Verify Checksum
+# Mandatory Checksum Verification (Fail-Closed)
+Write-Host "🔒 Verifying SHA-256 cryptographic checksum (fail-closed)..." -ForegroundColor Yellow
 try {
     Invoke-WebRequest -Uri $ChecksumUrl -OutFile $TempChecksum
-    $ExpectedHash = (Get-Content $TempChecksum | Select-String "$BinName-windows-x64.exe").ToString().Split(" ")[0].Trim()
-    if ($ExpectedHash) {
-        $ActualHash = (Get-FileHash -Path $TempFile -Algorithm SHA256).Hash.ToLower()
-        if ($ExpectedHash.ToLower() -ne $ActualHash) {
-            Write-Error "❌ Checksum verification failed! Expected: $ExpectedHash, Actual: $ActualHash"
-            exit 1
-        }
-        Write-Host "✅ SHA-256 Checksum verified." -ForegroundColor Green
-    }
 } catch {
-    Write-Host "ℹ️ Proceeding with downloaded binary."
+    Write-Error "❌ Failed to download release checksums from $ChecksumUrl. Aborting installation."
+    exit 1
 }
+
+$ChecksumContent = Get-Content $TempChecksum -ErrorAction SilentlyContinue
+$ChecksumLine = $ChecksumContent | Select-String "$BinName-windows-x64.exe"
+if (!$ChecksumLine) {
+    Write-Error "❌ Checksum for $BinName-windows-x64.exe not found in $ChecksumUrl. Aborting installation."
+    exit 1
+}
+
+$ExpectedHash = $ChecksumLine.ToString().Split(" ")[0].Trim()
+$ActualHash = (Get-FileHash -Path $TempFile -Algorithm SHA256).Hash.ToLower()
+if ($ExpectedHash.ToLower() -ne $ActualHash) {
+    Write-Error "❌ SHA-256 Checksum verification failed! Expected: $ExpectedHash, Actual: $ActualHash"
+    exit 1
+}
+Write-Host "✅ SHA-256 Checksum verified: $ActualHash" -ForegroundColor Green
 
 $TargetPath = "$InstallDir\$BinName.exe"
 $AliasPath = "$InstallDir\$AliasName.exe"

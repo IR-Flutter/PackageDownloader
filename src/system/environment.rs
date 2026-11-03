@@ -15,51 +15,98 @@ impl EnvironmentManager {
         env::var(key).ok()
     }
 
-    /// Locate candidate user shell configuration files on Unix systems.
-    pub fn get_unix_shell_files() -> Vec<PathBuf> {
+    /// Locate the targeted primary user shell configuration file on Unix systems.
+    /// Strictly targets ONLY the user's active/primary shell configuration file to
+    /// prevent modifying multiple shell files (.zshrc, .bashrc, .profile) simultaneously.
+    pub fn get_primary_unix_shell_file() -> Option<PathBuf> {
         let home = match env::var("HOME").or_else(|_| env::var("USERPROFILE")) {
             Ok(h) => PathBuf::from(h),
-            Err(_) => return Vec::new(),
+            Err(_) => return None,
         };
 
-        let candidate_names = if cfg!(target_os = "macos") {
-            vec![".zshrc", ".bash_profile", ".bashrc", ".profile"]
-        } else {
-            vec![".bashrc", ".profile", ".zshrc"]
-        };
-
-        let mut existing = Vec::new();
-        for name in candidate_names {
-            let path = home.join(name);
-            if path.exists() {
-                existing.push(path);
-            }
-        }
-
-        if existing.is_empty() {
+        let shell_env = env::var("SHELL").unwrap_or_default();
+        let target_name = if shell_env.ends_with("/zsh") || shell_env == "zsh" {
+            ".zshrc"
+        } else if shell_env.ends_with("/bash") || shell_env == "bash" {
             if cfg!(target_os = "macos") {
-                existing.push(home.join(".zshrc"));
+                if home.join(".bash_profile").exists() {
+                    ".bash_profile"
+                } else {
+                    ".bashrc"
+                }
             } else {
-                existing.push(home.join(".bashrc"));
+                ".bashrc"
             }
-        }
+        } else if cfg!(target_os = "macos") {
+            if home.join(".zshrc").exists() || !home.join(".bash_profile").exists() {
+                ".zshrc"
+            } else {
+                ".bash_profile"
+            }
+        } else {
+            ".bashrc"
+        };
 
-        existing
+        Some(home.join(target_name))
     }
 
-    /// Render shell export block for given environment variable mappings.
+    /// Locate candidate user shell configuration files on Unix systems.
+    /// Defaults to the single targeted primary shell configuration file.
+    pub fn get_unix_shell_files() -> Vec<PathBuf> {
+        Self::get_primary_unix_shell_file().into_iter().collect()
+    }
+
+    /// Safely escape a shell value using POSIX single-quote escaping.
+    /// Rejects forbidden newline, carriage return, null bytes, and malicious metacharacters.
+    pub fn escape_shell_value(val: &str) -> Result<String> {
+        if val.contains('\n') || val.contains('\r') || val.contains('\0') {
+            return Err(crate::core::errors::PdownError::InvalidConfig(
+                "Environment variable value contains forbidden newline or control characters"
+                    .into(),
+            ));
+        }
+
+        // Validate URLs to prevent shell command injection via parameter expansion or subshells
+        if val.starts_with("http://") || val.starts_with("https://") {
+            if val.contains(';')
+                || val.contains('&')
+                || val.contains('|')
+                || val.contains('`')
+                || val.contains('$')
+                || val.contains('(')
+                || val.contains(')')
+            {
+                return Err(crate::core::errors::PdownError::InvalidConfig(format!(
+                    "Suspicious shell metacharacter detected in URL value: '{val}'"
+                )));
+            }
+        }
+
+        // POSIX single-quote escaping: wrap in '...' and replace every ' with '\''.
+        // Inside single quotes, all characters are treated literally with zero expansion.
+        let escaped = val.replace('\'', r"'\''");
+        Ok(format!("'{escaped}'"))
+    }
+
+    /// Render shell export block for given environment variable mappings with robust escaping.
     pub fn render_unix_block(
         marker_start: &str,
         marker_end: &str,
         vars: &[(&str, &str)],
-    ) -> String {
+    ) -> Result<String> {
         let mut lines = Vec::new();
         lines.push(marker_start.to_string());
         for (k, v) in vars {
-            lines.push(format!("export {k}=\"{v}\""));
+            if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') || k.is_empty() {
+                return Err(crate::core::errors::PdownError::InvalidConfig(format!(
+                    "Invalid environment variable key: '{k}'"
+                )));
+            }
+            let escaped = Self::escape_shell_value(v)?;
+            lines.push(format!("export {k}={escaped}"));
         }
         lines.push(marker_end.to_string());
-        lines.join("\n")
+        Ok(lines.join("\n"))
     }
 
     /// Plan updating a shell file with new environment variables.
@@ -75,7 +122,7 @@ impl EnvironmentManager {
             None
         };
 
-        let payload = Self::render_unix_block(marker_start, marker_end, vars);
+        let payload = Self::render_unix_block(marker_start, marker_end, vars)?;
 
         let new_content = match &old_content {
             Some(existing) => {
@@ -163,5 +210,46 @@ impl EnvironmentManager {
             .args(["-NoProfile", "-Command", &script])
             .output()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escape_shell_value_normal() {
+        let escaped = EnvironmentManager::escape_shell_value("https://pub-azs.ir").unwrap();
+        assert_eq!(escaped, "'https://pub-azs.ir'");
+    }
+
+    #[test]
+    fn test_escape_shell_value_with_single_quotes() {
+        let escaped = EnvironmentManager::escape_shell_value("custom'value").unwrap();
+        assert_eq!(escaped, r"'custom'\''value'");
+    }
+
+    #[test]
+    fn test_escape_shell_value_rejects_newlines() {
+        assert!(EnvironmentManager::escape_shell_value("val\nmalicious").is_err());
+        assert!(EnvironmentManager::escape_shell_value("val\rmalicious").is_err());
+    }
+
+    #[test]
+    fn test_escape_shell_value_rejects_command_injection() {
+        assert!(EnvironmentManager::escape_shell_value("https://pub.ir;$(whoami)").is_err());
+        assert!(EnvironmentManager::escape_shell_value("https://pub.ir|cat /etc/passwd").is_err());
+        assert!(EnvironmentManager::escape_shell_value("https://pub.ir`id`").is_err());
+    }
+
+    #[test]
+    fn test_render_unix_block_escaping() {
+        let vars = [
+            ("PUB_HOSTED_URL", "https://pub-azs.ir"),
+            ("TEST_KEY", "simple_val"),
+        ];
+        let block = EnvironmentManager::render_unix_block("# START", "# END", &vars).unwrap();
+        assert!(block.contains("export PUB_HOSTED_URL='https://pub-azs.ir'"));
+        assert!(block.contains("export TEST_KEY='simple_val'"));
     }
 }
