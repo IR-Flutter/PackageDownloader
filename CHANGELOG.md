@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 4: Safe Configuration Engine & Transactions.
+  - Implemented transactional apply with automatic LIFO rollback upon partial failure.
+  - Snapshot backup engine with SHA-256 integrity verification (`BackupManager`).
+  - Safe dry-run preview (`--dry-run`) displaying color-unified diffs without modifying files.
+  - Atomic file writing preventing partial corruption during system crash or power-loss.
+  - Strict ownership tags (`# >>> Managed by pdown >>>`).
+  - Coalesced multi-ecosystem environment plans for Flutter, Dart, Gradle, and Android.
+  - Implemented `pdown use <id> [--only <providers>] [--dry-run]` and `pdown reset [--only <providers>] [--dry-run]`.
+  - Transaction integration tests (`tests/transaction_test.rs`).
 - Phase 3: Provider Implementations & Ecosystem Boundaries.
   - Implemented modular `Provider` trait and engine.
   - `FlutterProvider`: Handles `FLUTTER_STORAGE_BASE_URL` with verification that the target mirror actually hosts `flutter_infra_release` SDK artifacts.

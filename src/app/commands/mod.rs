@@ -2,12 +2,13 @@ use crate::app::cli::{
     Cli, Commands, ListArgs, MirrorArgs, MirrorSubcommands, RegistryArgs, RegistrySubcommands,
 };
 use crate::core::errors::{PdownError, Result};
+use crate::core::provider::Provider;
 use crate::core::registry::RegistryManager;
 use crate::infrastructure::storage::StorageManager;
 
 pub async fn execute(cli: Cli) -> Result<()> {
     let storage = StorageManager::new()?;
-    let registry = RegistryManager::new(storage);
+    let registry = RegistryManager::new(storage.clone());
 
     match cli.command {
         Some(Commands::List(args)) => handle_list(&registry, args, cli.json).await,
@@ -18,14 +19,8 @@ pub async fn execute(cli: Cli) -> Result<()> {
             println!("pdown test - available in Phase 5");
             Ok(())
         }
-        Some(Commands::Use(args)) => {
-            println!("pdown use {} - available in Phase 4", args.mirror_id);
-            Ok(())
-        }
-        Some(Commands::Reset(_args)) => {
-            println!("pdown reset - available in Phase 4");
-            Ok(())
-        }
+        Some(Commands::Use(args)) => handle_use(&registry, &storage, args, cli.json).await,
+        Some(Commands::Reset(args)) => handle_reset(&storage, args, cli.json).await,
         Some(Commands::Doctor(_args)) => {
             println!("pdown doctor - available in Phase 6");
             Ok(())
@@ -45,6 +40,236 @@ pub async fn execute(cli: Cli) -> Result<()> {
             Ok(())
         }
     }
+}
+
+async fn handle_use(
+    registry: &RegistryManager,
+    storage: &StorageManager,
+    args: crate::app::cli::UseArgs,
+    json: bool,
+) -> Result<()> {
+    let mirror = registry
+        .find_mirror(&args.mirror_id)?
+        .ok_or_else(|| PdownError::MirrorNotFound(args.mirror_id.clone()))?;
+
+    let only_set: Option<Vec<String>> = args
+        .only
+        .map(|s| s.split(',').map(|p| p.trim().to_lowercase()).collect());
+
+    let has_flutter = only_set
+        .as_ref()
+        .map_or(true, |f| f.contains(&"flutter".to_string()))
+        && mirror.providers.flutter.as_ref().is_some_and(|f| f.enabled);
+
+    let has_dart = only_set.as_ref().map_or(true, |d| {
+        d.contains(&"dart".to_string()) || d.contains(&"pub".to_string())
+    }) && mirror.providers.dart.as_ref().is_some_and(|d| d.enabled);
+
+    let has_gradle = only_set
+        .as_ref()
+        .map_or(true, |g| g.contains(&"gradle".to_string()))
+        && mirror.providers.gradle.as_ref().is_some_and(|g| g.enabled);
+
+    let has_android = only_set
+        .as_ref()
+        .map_or(true, |a| a.contains(&"android".to_string()))
+        && mirror.providers.android.as_ref().is_some_and(|a| a.enabled);
+
+    // If user explicitly asked for a provider via --only, verify it's supported
+    if let Some(ref filter) = only_set {
+        for target in filter {
+            match target.as_str() {
+                "flutter" if !has_flutter => {
+                    return Err(PdownError::ProviderUnsupported {
+                        provider: "flutter".into(),
+                        reason: format!(
+                            "Mirror '{}' does not support Flutter storage artifacts",
+                            mirror.id
+                        ),
+                    });
+                }
+                "dart" | "pub" if !has_dart => {
+                    return Err(PdownError::ProviderUnsupported {
+                        provider: "dart".into(),
+                        reason: format!(
+                            "Mirror '{}' does not support Dart/Pub packages",
+                            mirror.id
+                        ),
+                    });
+                }
+                "gradle" if !has_gradle => {
+                    return Err(PdownError::ProviderUnsupported {
+                        provider: "gradle".into(),
+                        reason: format!(
+                            "Mirror '{}' does not support Gradle repositories",
+                            mirror.id
+                        ),
+                    });
+                }
+                "android" if !has_android => {
+                    return Err(PdownError::ProviderUnsupported {
+                        provider: "android".into(),
+                        reason: format!(
+                            "Mirror '{}' does not support Android repositories",
+                            mirror.id
+                        ),
+                    });
+                }
+                "ios" => {
+                    return Err(PdownError::ProviderUnsupported {
+                        provider: "ios".into(),
+                        reason: "iOS provider is guarded and unsupported".into(),
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let mut plans = Vec::new();
+
+    // 1. Unified Flutter & Dart Environment Plan
+    if has_flutter || has_dart {
+        let mut vars = Vec::new();
+        if has_flutter {
+            if let Some(ref f) = mirror.providers.flutter {
+                vars.push(("FLUTTER_STORAGE_BASE_URL", f.storage_url.as_str()));
+            }
+        }
+        if has_dart {
+            if let Some(ref d) = mirror.providers.dart {
+                vars.push(("PUB_HOSTED_URL", d.hosted_url.as_str()));
+            }
+        }
+
+        let mut items = Vec::new();
+        for file in crate::system::environment::EnvironmentManager::get_unix_shell_files() {
+            items.push(
+                crate::system::environment::EnvironmentManager::plan_unix_file_update(
+                    &file,
+                    crate::system::environment::MARKER_START_FLUTTER_DART,
+                    crate::system::environment::MARKER_END_FLUTTER_DART,
+                    &vars,
+                )?,
+            );
+        }
+
+        let mut desc_parts = Vec::new();
+        if has_flutter {
+            desc_parts.push("Flutter");
+        }
+        if has_dart {
+            desc_parts.push("Dart");
+        }
+
+        plans.push(crate::core::models::ChangePlan {
+            provider_id: desc_parts.join(" & "),
+            description: format!(
+                "Configure environment variables for {}",
+                desc_parts.join(" and ")
+            ),
+            items,
+        });
+    }
+
+    // 2. Gradle Plan (executed once for gradle and/or android)
+    if has_gradle || has_android {
+        let mut gradle_plan = crate::providers::GradleProvider.plan_apply(&mirror)?;
+        if has_gradle && has_android {
+            gradle_plan.provider_id = "Gradle & Android".into();
+        }
+        plans.push(gradle_plan);
+    }
+
+    if plans.is_empty() {
+        return Err(PdownError::InvalidConfig(format!(
+            "No eligible providers found to activate for mirror '{}'",
+            mirror.id
+        )));
+    }
+
+    let backup_mgr = crate::system::backup::BackupManager::new(storage);
+    let engine = crate::core::transaction::TransactionEngine::new(backup_mgr, args.dry_run);
+    let report = engine.execute(plans)?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
+    if args.dry_run {
+        println!(
+            "\n🔍 [DRY-RUN] Proposed Changes for mirror '{}':\n",
+            mirror.name
+        );
+        for diff in &report.diffs {
+            println!("{diff}\n");
+        }
+        println!("ℹ️ Dry-run completed. No files were modified.");
+    } else {
+        println!(
+            "\n✅ Successfully activated mirror: {} [{}]",
+            mirror.name, mirror.id
+        );
+        println!(
+            "   Providers configured: {}",
+            report.successful_providers.join(", ")
+        );
+        println!("   Files modified:       {}", report.modified_files.len());
+        println!("   Backups created:      {}", report.backups.len());
+        println!("\n📌 Reminder: Please restart your terminal or IDE (VS Code / Android Studio) for changes to take effect.");
+    }
+
+    Ok(())
+}
+
+async fn handle_reset(
+    storage: &StorageManager,
+    args: crate::app::cli::ResetArgs,
+    json: bool,
+) -> Result<()> {
+    let only_set: Option<Vec<String>> = args
+        .only
+        .map(|s| s.split(',').map(|p| p.trim().to_lowercase()).collect());
+
+    let mut plans = Vec::new();
+    let providers = crate::providers::all_providers();
+
+    for p in providers {
+        let p_id = p.id().to_lowercase();
+        if let Some(ref filter) = only_set {
+            if !filter.contains(&p_id) {
+                continue;
+            }
+        }
+        plans.push(p.plan_revert()?);
+    }
+
+    let backup_mgr = crate::system::backup::BackupManager::new(storage);
+    let engine = crate::core::transaction::TransactionEngine::new(backup_mgr, args.dry_run);
+    let report = engine.execute(plans)?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
+    if args.dry_run {
+        println!("\n🔍 [DRY-RUN] Proposed Reset Operations:\n");
+        for diff in &report.diffs {
+            println!("{diff}\n");
+        }
+        println!("ℹ️ Dry-run completed. No files were modified.");
+    } else {
+        println!("\n🔄 Successfully reset configuration to official Google & upstream defaults.");
+        println!(
+            "   Providers reset: {}",
+            report.successful_providers.join(", ")
+        );
+        println!("   Files updated:   {}", report.modified_files.len());
+    }
+
+    Ok(())
 }
 
 async fn handle_status(_args: crate::app::cli::StatusArgs, json: bool) -> Result<()> {
