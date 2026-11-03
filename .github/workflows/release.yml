@@ -9,8 +9,30 @@ permissions:
   contents: write
 
 jobs:
+  pre-release-quality-gate:
+    name: Verify Quality Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Code Formatting Check
+        run: cargo fmt --check
+
+      - name: Clippy Lint
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Complete Test Suite
+        run: cargo test --all-targets --all-features
+
   build:
     name: Build (${{ matrix.target }})
+    needs: pre-release-quality-gate
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

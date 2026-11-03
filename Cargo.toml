@@ -24,6 +24,10 @@ path = "src/main.rs"
 name = "irflutter"
 path = "src/bin/irflutter.rs"
 
+[[bin]]
+name = "sign_registry"
+path = "src/bin/sign_registry.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
 tokio = { version = "1.40", features = ["full"] }

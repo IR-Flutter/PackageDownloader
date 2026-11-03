@@ -1,0 +1,64 @@
+name: Registry Verification & Automated Signing
+
+on:
+  pull_request:
+    paths:
+      - 'registry/**'
+      - '.github/workflows/registry-signing.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'registry/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  validate-and-test:
+    name: Validate Registry Integrity & Live Endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Registry Schema & Semantics
+        run: cargo test --test registry_test
+
+      - name: Run Live Endpoint Probes
+        run: cargo run --bin pdown -- test --timeout 8
+        continue-on-error: true
+
+  sign-and-publish:
+    name: Sign Registry (Maintainer Release / Main Branch)
+    needs: validate-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Sign mirrors.json using Protected Secret Key
+        if: env.REGISTRY_SIGNING_PRIVATE_KEY != ''
+        env:
+          REGISTRY_SIGNING_PRIVATE_KEY: ${{ secrets.REGISTRY_SIGNING_PRIVATE_KEY }}
+        run: |
+          cargo run --bin sign_registry
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n $(git status --porcelain registry/mirrors.json.sig) ]]; then
+            git add registry/mirrors.json.sig
+            git commit -m "chore(registry): update canonical signature for mirrors.json [skip ci]"
+            git push
+          else
+            echo "Signature is already up to date."
+          fi
