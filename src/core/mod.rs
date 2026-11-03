@@ -3,6 +3,7 @@
 pub mod benchmark;
 pub mod errors;
 pub mod models;
+pub mod profile;
 pub mod provider;
 pub mod registry;
 pub mod transaction;

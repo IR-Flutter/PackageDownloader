@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 6: Profiles, System Diagnostics & Documentation.
+  - Multi-tenant profile management (`default`, `iran`, `custom`).
+  - Implemented `pdown profile list|use|create`.
+  - Implemented `pdown doctor` comprehensive diagnostic checks (tools, permissions, conflict detection).
+  - Implemented `pdown config show` displaying storage directories and active configurations.
+  - Integration tests in `tests/profile_test.rs`.
+  - Complete user guides: `docs/USAGE.md`, `docs/INSTALLATION.md`, and `docs/TROUBLESHOOTING.md`.
 - Phase 5: Mirror Health and Multi-Metric Selection Engine.
   - Implemented multi-stage health probes: ecosystem-specific payload requests, HTTP status verification, and latency measurement.
   - Specific probes: `/api/packages/http` (Pub), `releases_linux.json` (Flutter Storage), and real POM XML downloads (Google Maven & Maven Central).

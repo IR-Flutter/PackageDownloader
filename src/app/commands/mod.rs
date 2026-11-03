@@ -5,6 +5,8 @@ use crate::core::errors::{PdownError, Result};
 use crate::core::provider::Provider;
 use crate::core::registry::RegistryManager;
 use crate::infrastructure::storage::StorageManager;
+use std::fs;
+use std::path::PathBuf;
 
 pub async fn execute(cli: Cli) -> Result<()> {
     let storage = StorageManager::new()?;
@@ -18,22 +20,210 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Some(Commands::Test(args)) => handle_test(&registry, args, cli.json).await,
         Some(Commands::Use(args)) => handle_use(&registry, &storage, args, cli.json).await,
         Some(Commands::Reset(args)) => handle_reset(&storage, args, cli.json).await,
-        Some(Commands::Doctor(_args)) => {
-            println!("pdown doctor - available in Phase 6");
-            Ok(())
-        }
-        Some(Commands::Profile(_args)) => {
-            println!("pdown profile - available in Phase 6");
-            Ok(())
-        }
-        Some(Commands::Config(_args)) => {
-            println!("pdown config - available in Phase 6");
-            Ok(())
-        }
+        Some(Commands::Doctor(_args)) => handle_doctor(&storage, cli.json).await,
+        Some(Commands::Profile(args)) => handle_profile(&storage, args, cli.json).await,
+        Some(Commands::Config(args)) => handle_config(&storage, args, cli.json).await,
         None => {
             use clap::CommandFactory;
             Cli::command().print_help().unwrap();
             println!();
+            Ok(())
+        }
+    }
+}
+
+async fn handle_doctor(storage: &StorageManager, json: bool) -> Result<()> {
+    #[derive(serde::Serialize)]
+    struct DoctorCheck {
+        category: &'static str,
+        name: String,
+        passed: bool,
+        message: String,
+    }
+
+    let mut checks = Vec::new();
+
+    // 1. Tool availability in PATH
+    for tool in &["flutter", "dart", "gradle", "javac"] {
+        let in_path = std::process::Command::new("which")
+            .arg(tool)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+
+        checks.push(DoctorCheck {
+            category: "Environment Tools",
+            name: tool.to_string(),
+            passed: in_path,
+            message: if in_path {
+                "Found in PATH".into()
+            } else {
+                "Not found in PATH (optional unless developing for this ecosystem)".into()
+            },
+        });
+    }
+
+    // 2. Storage and Permissions
+    let config_writable =
+        storage.config_dir().exists() || fs::create_dir_all(storage.config_dir()).is_ok();
+    checks.push(DoctorCheck {
+        category: "Filesystem Permissions",
+        name: "Config Directory".into(),
+        passed: config_writable,
+        message: format!("{}", storage.config_dir().display()),
+    });
+
+    let gradle_dir = crate::providers::GradleProvider::gradle_user_home();
+    let gradle_writable = gradle_dir.exists() || fs::create_dir_all(&gradle_dir).is_ok();
+    checks.push(DoctorCheck {
+        category: "Filesystem Permissions",
+        name: "Gradle User Home".into(),
+        passed: gradle_writable,
+        message: format!("{}", gradle_dir.display()),
+    });
+
+    // 3. Conflict Detection: Legacy init.gradle
+    let legacy_init = gradle_dir.join("init.gradle");
+    let has_conflict = if legacy_init.exists() {
+        let content = fs::read_to_string(&legacy_init).unwrap_or_default();
+        content.contains("IR-Flutter Gradle Mirror Script")
+    } else {
+        false
+    };
+
+    checks.push(DoctorCheck {
+        category: "Conflict Detection",
+        name: "Legacy init.gradle".into(),
+        passed: !has_conflict,
+        message: if has_conflict {
+            "Detected legacy v1.x init.gradle script. Recommend running 'pdown reset' or removing manually.".into()
+        } else {
+            "No legacy conflicts detected".into()
+        },
+    });
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&checks)?);
+        return Ok(());
+    }
+
+    println!("\n🩺 PackageDownloader Diagnostic Health Check:\n");
+    let mut current_cat = "";
+    for check in &checks {
+        if check.category != current_cat {
+            current_cat = check.category;
+            println!("📋 [{}]", current_cat);
+        }
+        let icon = if check.passed { "✅" } else { "⚠️ " };
+        println!("   {} {:<20} -> {}", icon, check.name, check.message);
+    }
+    println!();
+    Ok(())
+}
+
+async fn handle_profile(
+    storage: &StorageManager,
+    args: crate::app::cli::ProfileArgs,
+    json: bool,
+) -> Result<()> {
+    let mgr = crate::core::profile::ProfileManager::new(storage.clone());
+
+    match args.subcommand {
+        crate::app::cli::ProfileSubcommands::List => {
+            let active = mgr.get_active_profile_name();
+            let profiles = mgr.list_profiles()?;
+
+            if json {
+                #[derive(serde::Serialize)]
+                struct ProfileListOutput {
+                    active: String,
+                    profiles: Vec<String>,
+                }
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&ProfileListOutput { active, profiles })?
+                );
+                return Ok(());
+            }
+
+            println!("\n📁 Available Configuration Profiles:\n");
+            for p in &profiles {
+                if p == &active {
+                    println!("   • {} (active)", p);
+                } else {
+                    println!("   • {}", p);
+                }
+            }
+            println!("\nSwitch active profile with: pdown profile use <name>\n");
+            Ok(())
+        }
+        crate::app::cli::ProfileSubcommands::Use { name } => {
+            let clean = name.trim().to_lowercase();
+            let _profile = mgr.load_profile(&clean)?;
+            mgr.set_active_profile_name(&clean)?;
+            if json {
+                println!("{{\"active_profile\": \"{}\"}}", clean);
+            } else {
+                println!("✅ Switched active profile to '{}'", clean);
+            }
+            Ok(())
+        }
+        crate::app::cli::ProfileSubcommands::Create { name } => {
+            let created = mgr.create_profile(&name)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&created)?);
+            } else {
+                println!("🎉 Created new configuration profile '{}'", created.name);
+            }
+            Ok(())
+        }
+    }
+}
+
+async fn handle_config(
+    storage: &StorageManager,
+    args: crate::app::cli::ConfigArgs,
+    json: bool,
+) -> Result<()> {
+    match args.subcommand {
+        crate::app::cli::ConfigSubcommands::Show => {
+            let mgr = crate::core::profile::ProfileManager::new(storage.clone());
+            let active_profile = mgr.get_active_profile_name();
+
+            #[derive(serde::Serialize)]
+            struct ConfigShowReport {
+                config_dir: PathBuf,
+                data_dir: PathBuf,
+                cache_dir: PathBuf,
+                backup_dir: PathBuf,
+                active_profile: String,
+                canonical_registry_url: String,
+                public_key: String,
+            }
+
+            let report = ConfigShowReport {
+                config_dir: storage.config_dir().to_path_buf(),
+                data_dir: storage.data_dir().to_path_buf(),
+                cache_dir: storage.cache_dir().to_path_buf(),
+                backup_dir: storage.backup_dir(),
+                active_profile,
+                canonical_registry_url: crate::core::registry::CANONICAL_REGISTRY_URL.to_string(),
+                public_key: crate::infrastructure::crypto::EMBEDDED_REGISTRY_PUBLIC_KEY.to_string(),
+            };
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("\n⚙️ PackageDownloader Configuration:\n");
+                println!("   Config Directory:   {}", report.config_dir.display());
+                println!("   Data Directory:     {}", report.data_dir.display());
+                println!("   Cache Directory:    {}", report.cache_dir.display());
+                println!("   Backup Directory:   {}", report.backup_dir.display());
+                println!("   Active Profile:     {}", report.active_profile);
+                println!("   Canonical Registry: {}", report.canonical_registry_url);
+                println!("   Public Key Anchor:  {}", report.public_key);
+                println!();
+            }
             Ok(())
         }
     }
