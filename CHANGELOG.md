@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 7: Cross-Platform Validation & Binary Parity.
+  - Validated cross-platform CLI execution with `assert_cmd`.
+  - Verified binary alias parity between `pdown` and `irflutter`.
+  - Added Windows user environment persistence support via `setx` and PowerShell hooks.
+  - Multi-platform integration test suite (`tests/cross_platform_test.rs`).
 - Phase 6: Profiles, System Diagnostics & Documentation.
   - Multi-tenant profile management (`default`, `iran`, `custom`).
   - Implemented `pdown profile list|use|create`.

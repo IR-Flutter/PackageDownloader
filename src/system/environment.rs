@@ -147,4 +147,21 @@ impl EnvironmentManager {
             diff,
         }))
     }
+
+    #[cfg(target_os = "windows")]
+    pub fn set_windows_user_var(key: &str, val: &str) -> std::io::Result<()> {
+        std::process::Command::new("setx")
+            .args([key, val])
+            .output()?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn remove_windows_user_var(key: &str) -> std::io::Result<()> {
+        let script = format!("[Environment]::SetEnvironmentVariable('{key}', $null, 'User')");
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &script])
+            .output()?;
+        Ok(())
+    }
 }
