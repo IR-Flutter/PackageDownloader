@@ -18,6 +18,11 @@ pub struct TransactionReport {
 enum RollbackAction {
     RestoreBackup(BackupRecord),
     DeleteCreatedFile(PathBuf),
+    #[allow(dead_code)]
+    RevertEnvironment {
+        key: String,
+        old_value: Option<String>,
+    },
 }
 
 pub struct TransactionEngine {
@@ -58,7 +63,22 @@ impl TransactionEngine {
                             path.display()
                         ));
                     }
-                    _ => {}
+                    ChangeItem::EnvironmentSet {
+                        key,
+                        old_value,
+                        new_value,
+                    } => {
+                        let old_disp = old_value.as_deref().unwrap_or("<unset>");
+                        report.diffs.push(format!(
+                            "Environment Variable [{key}]:\n- {old_disp}\n+ {new_value}"
+                        ));
+                    }
+                    ChangeItem::EnvironmentUnset { key, old_value } => {
+                        let old_disp = old_value.as_deref().unwrap_or("<unset>");
+                        report.diffs.push(format!(
+                            "Environment Variable [{key}]:\n- {old_disp}\n+ <unset>"
+                        ));
+                    }
                 }
             }
         }
@@ -141,8 +161,41 @@ impl TransactionEngine {
                         report.modified_files.push(path.clone());
                     }
                 }
-                ChangeItem::EnvironmentSet { .. } | ChangeItem::EnvironmentUnset { .. } => {
-                    // Handled via shell profile FileWrites
+                ChangeItem::EnvironmentSet {
+                    key,
+                    old_value,
+                    new_value,
+                } => {
+                    #[cfg(target_os = "windows")]
+                    {
+                        crate::system::environment::EnvironmentManager::set_windows_user_var(
+                            key, new_value,
+                        )?;
+                        rollback_stack.push(RollbackAction::RevertEnvironment {
+                            key: key.clone(),
+                            old_value: old_value.clone(),
+                        });
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let _ = (key, old_value, new_value);
+                    }
+                }
+                ChangeItem::EnvironmentUnset { key, old_value } => {
+                    #[cfg(target_os = "windows")]
+                    {
+                        crate::system::environment::EnvironmentManager::remove_windows_user_var(
+                            key,
+                        )?;
+                        rollback_stack.push(RollbackAction::RevertEnvironment {
+                            key: key.clone(),
+                            old_value: old_value.clone(),
+                        });
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let _ = (key, old_value);
+                    }
                 }
             }
         }
@@ -181,6 +234,35 @@ impl TransactionEngine {
                                 path.display()
                             );
                         }
+                    }
+                }
+                RollbackAction::RevertEnvironment { key, old_value } => {
+                    #[cfg(target_os = "windows")]
+                    {
+                        let res = match old_value {
+                            Some(ref val) => {
+                                crate::system::environment::EnvironmentManager::set_windows_user_var(
+                                    &key, val,
+                                )
+                            }
+                            None => {
+                                crate::system::environment::EnvironmentManager::remove_windows_user_var(
+                                    &key,
+                                )
+                            }
+                        };
+                        if let Err(e) = res {
+                            let err_msg =
+                                format!("Failed to revert environment variable '{key}': {e}");
+                            error!("{err_msg}");
+                            rollback_errors.push(err_msg);
+                        } else {
+                            info!("Reverted environment variable '{key}' during rollback");
+                        }
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let _ = (key, old_value);
                     }
                 }
             }
@@ -262,5 +344,38 @@ mod tests {
         assert!(result.is_err(), "Transaction must fail on invalid write");
         // Verify target_a was rolled back to original content
         assert_eq!(fs::read_to_string(&target_a).unwrap(), "original a");
+    }
+
+    #[test]
+    fn test_transaction_diff_formatting_for_environment_changes() {
+        let tmp = tempdir().unwrap();
+        let backup_mgr = BackupManager::with_custom_dir(tmp.path().join("backups"));
+        let engine = TransactionEngine::new(backup_mgr, true);
+
+        let plan = ChangePlan {
+            provider_id: "env-test".into(),
+            description: "test env diffs".into(),
+            items: vec![
+                ChangeItem::EnvironmentSet {
+                    key: "PUB_HOSTED_URL".into(),
+                    old_value: Some("https://old.url".into()),
+                    new_value: "https://pub-azs.ir".into(),
+                },
+                ChangeItem::EnvironmentUnset {
+                    key: "FLUTTER_STORAGE_BASE_URL".into(),
+                    old_value: Some("https://storage.googleapis.com".into()),
+                },
+            ],
+        };
+
+        let report = engine.execute(vec![plan]).unwrap();
+        assert_eq!(report.diffs.len(), 2);
+        assert!(report.diffs[0].contains("Environment Variable [PUB_HOSTED_URL]:"));
+        assert!(report.diffs[0].contains("- https://old.url"));
+        assert!(report.diffs[0].contains("+ https://pub-azs.ir"));
+
+        assert!(report.diffs[1].contains("Environment Variable [FLUTTER_STORAGE_BASE_URL]:"));
+        assert!(report.diffs[1].contains("- https://storage.googleapis.com"));
+        assert!(report.diffs[1].contains("+ <unset>"));
     }
 }

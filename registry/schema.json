@@ -91,7 +91,7 @@
           },
           "verification": {
             "type": ["string", "null"],
-            "enum": ["verified", "partially_verified", "unverified", "unavailable", "unsupported", null],
+            "enum": ["verified", "partially_verified", "unverified", "unavailable", "unsupported", "upstream_reference", null],
             "description": "Verification status of mirror"
           },
           "last_verified_at": {

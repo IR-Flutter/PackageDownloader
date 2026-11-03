@@ -1,7 +1,16 @@
 use crate::core::models::{BenchmarkProbeResult, MirrorBenchmarkSummary, MirrorDefinition};
 use crate::infrastructure::http::build_http_client;
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tracing::debug;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct BenchmarkRecommendations {
+    pub best_overall: Option<String>,
+    pub best_for_flutter: Option<String>,
+    pub best_for_dart: Option<String>,
+    pub best_for_gradle: Option<String>,
+}
 
 pub struct BenchmarkEngine {
     timeout_secs: u64,
@@ -223,7 +232,149 @@ impl BenchmarkEngine {
         summaries
     }
 
+    /// Computes per-ecosystem and overall recommendations based on benchmark summaries
+    /// and mirror definitions.
+    /// Strictly excludes mirrors that are globally disabled or have disabled providers.
+    pub fn compute_recommendations(
+        summaries: &[MirrorBenchmarkSummary],
+        mirrors: &[MirrorDefinition],
+    ) -> BenchmarkRecommendations {
+        let mut rec = BenchmarkRecommendations::default();
+
+        // 1. Overall best: highest quality score among mirrors that are enabled and overall_reachable
+        let best_overall = summaries.iter().find(|s| {
+            if !s.overall_reachable {
+                return false;
+            }
+            mirrors.iter().any(|m| m.id == s.mirror_id && m.enabled)
+        });
+        rec.best_overall = best_overall.map(|s| s.mirror_id.clone());
+
+        // 2. Best for Flutter: mirror with enabled Flutter provider, with reachable flutter probe
+        let mut best_flutter: Option<(&MirrorDefinition, u64)> = None;
+        for s in summaries {
+            if let Some(m) = mirrors.iter().find(|m| m.id == s.mirror_id && m.enabled) {
+                if m.providers.flutter.as_ref().is_some_and(|f| f.enabled) {
+                    if let Some(probe) = s
+                        .probes
+                        .iter()
+                        .find(|p| p.provider_id == "flutter" && p.reachable)
+                    {
+                        match best_flutter {
+                            None => best_flutter = Some((m, probe.total_latency_ms)),
+                            Some((_, lowest_lat)) if probe.total_latency_ms < lowest_lat => {
+                                best_flutter = Some((m, probe.total_latency_ms));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        rec.best_for_flutter = best_flutter.map(|(m, _)| m.id.clone());
+
+        // 3. Best for Dart: mirror with enabled Dart provider, with reachable dart probe
+        let mut best_dart: Option<(&MirrorDefinition, u64)> = None;
+        for s in summaries {
+            if let Some(m) = mirrors.iter().find(|m| m.id == s.mirror_id && m.enabled) {
+                if m.providers.dart.as_ref().is_some_and(|d| d.enabled) {
+                    if let Some(probe) = s
+                        .probes
+                        .iter()
+                        .find(|p| p.provider_id == "dart" && p.reachable)
+                    {
+                        match best_dart {
+                            None => best_dart = Some((m, probe.total_latency_ms)),
+                            Some((_, lowest_lat)) if probe.total_latency_ms < lowest_lat => {
+                                best_dart = Some((m, probe.total_latency_ms));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        rec.best_for_dart = best_dart.map(|(m, _)| m.id.clone());
+
+        // 4. Best for Gradle: mirror with enabled Gradle provider, with reachable gradle probe
+        let mut best_gradle: Option<(&MirrorDefinition, u64)> = None;
+        for s in summaries {
+            if let Some(m) = mirrors.iter().find(|m| m.id == s.mirror_id && m.enabled) {
+                if m.providers.gradle.as_ref().is_some_and(|g| g.enabled) {
+                    let reachable_gradle_probes: Vec<&BenchmarkProbeResult> = s
+                        .probes
+                        .iter()
+                        .filter(|p| p.provider_id.starts_with("gradle") && p.reachable)
+                        .collect();
+                    if !reachable_gradle_probes.is_empty() {
+                        let avg_gradle_lat: u64 = reachable_gradle_probes
+                            .iter()
+                            .map(|p| p.total_latency_ms)
+                            .sum::<u64>()
+                            / reachable_gradle_probes.len() as u64;
+                        match best_gradle {
+                            None => best_gradle = Some((m, avg_gradle_lat)),
+                            Some((_, lowest_lat)) if avg_gradle_lat < lowest_lat => {
+                                best_gradle = Some((m, avg_gradle_lat));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        rec.best_for_gradle = best_gradle.map(|(m, _)| m.id.clone());
+
+        rec
+    }
+
+    /// Execute a multi-sample probe: runs two consecutive samples to smooth network variance
+    /// and separates latency from throughput metrics.
     async fn probe_endpoint(
+        &self,
+        client: &reqwest::Client,
+        provider_id: &str,
+        url: &str,
+        expected_substring: Option<&str>,
+    ) -> BenchmarkProbeResult {
+        let sample1 = self
+            .execute_single_probe(client, provider_id, url, expected_substring)
+            .await;
+        if !sample1.reachable {
+            return sample1;
+        }
+
+        let sample2 = self
+            .execute_single_probe(client, provider_id, url, expected_substring)
+            .await;
+        if !sample2.reachable {
+            return sample1;
+        }
+
+        let avg_latency = (sample1.total_latency_ms + sample2.total_latency_ms) / 2;
+        let avg_throughput = match (sample1.throughput_kbps, sample2.throughput_kbps) {
+            (Some(t1), Some(t2)) => Some((t1 + t2) / 2.0),
+            (Some(t1), None) => Some(t1),
+            (None, Some(t2)) => Some(t2),
+            (None, None) => None,
+        };
+
+        BenchmarkProbeResult {
+            provider_id: provider_id.to_string(),
+            endpoint_url: url.to_string(),
+            reachable: true,
+            http_status: sample2.http_status.or(sample1.http_status),
+            dns_ms: None,
+            tcp_ms: None,
+            tls_ms: None,
+            total_latency_ms: avg_latency,
+            bytes_transferred: sample2.bytes_transferred.or(sample1.bytes_transferred),
+            throughput_kbps: avg_throughput,
+            error: None,
+        }
+    }
+
+    async fn execute_single_probe(
         &self,
         client: &reqwest::Client,
         provider_id: &str,
@@ -239,11 +390,15 @@ impl BenchmarkEngine {
                 let is_http_success = status.is_success();
 
                 if is_http_success {
+                    let transfer_start = Instant::now();
                     match resp.bytes().await {
                         Ok(bytes) => {
                             let total_latency_ms = start.elapsed().as_millis() as u64;
+                            let transfer_duration = transfer_start.elapsed().as_secs_f64();
                             let bytes_len = bytes.len();
-                            let throughput_kbps = if total_latency_ms > 0 {
+                            let throughput_kbps = if transfer_duration > 0.0001 {
+                                Some((bytes_len as f64 / 1024.0) / transfer_duration)
+                            } else if total_latency_ms > 0 {
                                 Some(
                                     (bytes_len as f64 / 1024.0)
                                         / (total_latency_ms as f64 / 1000.0),

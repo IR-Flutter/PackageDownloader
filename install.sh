@@ -47,7 +47,7 @@ esac
 echo "🔍 Fetching latest release information..."
 LATEST_TAG=$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
 if [ -z "$LATEST_TAG" ]; then
-  LATEST_TAG="v2.0.0"
+  LATEST_TAG="v2.0.1"
 fi
 
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/$BIN_NAME-$TARGET"

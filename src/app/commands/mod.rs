@@ -287,6 +287,13 @@ async fn handle_use(
         .find_mirror(&args.mirror_id)?
         .ok_or_else(|| PdownError::MirrorNotFound(args.mirror_id.clone()))?;
 
+    if !mirror.enabled {
+        return Err(PdownError::InvalidConfig(format!(
+            "Mirror '{}' is globally disabled in the registry",
+            mirror.id
+        )));
+    }
+
     let only_set: Option<Vec<String>> = args
         .only
         .map(|s| s.split(',').map(|p| p.trim().to_lowercase()).collect());
@@ -382,15 +389,26 @@ async fn handle_use(
         }
 
         let mut items = Vec::new();
-        for file in crate::system::environment::EnvironmentManager::get_unix_shell_files() {
-            items.push(
-                crate::system::environment::EnvironmentManager::plan_unix_file_update(
-                    &file,
-                    crate::system::environment::MARKER_START_FLUTTER_DART,
-                    crate::system::environment::MARKER_END_FLUTTER_DART,
-                    &vars,
-                )?,
-            );
+        if cfg!(target_os = "windows") {
+            for (key, val) in &vars {
+                let old_value = crate::system::environment::EnvironmentManager::get_var(key);
+                items.push(crate::core::models::ChangeItem::EnvironmentSet {
+                    key: key.to_string(),
+                    old_value,
+                    new_value: val.to_string(),
+                });
+            }
+        } else {
+            for file in crate::system::environment::EnvironmentManager::get_unix_shell_files() {
+                items.push(
+                    crate::system::environment::EnvironmentManager::plan_unix_file_update(
+                        &file,
+                        crate::system::environment::MARKER_START_FLUTTER_DART,
+                        crate::system::environment::MARKER_END_FLUTTER_DART,
+                        &vars,
+                    )?,
+                );
+            }
         }
 
         let mut desc_parts = Vec::new();
@@ -536,9 +554,22 @@ async fn handle_test(
     }
 
     let summaries = engine.benchmark_all(&mirrors).await;
+    let recommendations =
+        crate::core::benchmark::BenchmarkEngine::compute_recommendations(&summaries, &mirrors);
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&summaries)?);
+        #[derive(serde::Serialize)]
+        struct BenchmarkReport {
+            summaries: Vec<crate::core::models::MirrorBenchmarkSummary>,
+            recommendations: crate::core::benchmark::BenchmarkRecommendations,
+        }
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&BenchmarkReport {
+                summaries,
+                recommendations
+            })?
+        );
         return Ok(());
     }
 
@@ -582,30 +613,41 @@ async fn handle_test(
         println!();
     }
 
-    // Recommendation logic: prioritize fully reachable mirror with highest quality score.
-    // If none are fully reachable, suggest highest scoring partial mirror with warning.
-    let best = summaries
-        .iter()
-        .find(|s| s.overall_reachable)
-        .or_else(|| summaries.iter().find(|s| s.partially_reachable));
-
-    if let Some(best) = best {
-        if best.overall_reachable {
+    println!("💡 Recommendations:");
+    if let Some(ref best_id) = recommendations.best_overall {
+        if let Some(best) = summaries.iter().find(|s| s.mirror_id == *best_id) {
             println!(
-                "💡 Recommended Mirror: [{}] {} (Score: {:.1}, Avg Latency: {}ms)",
+                "   • Overall Recommended: [{}] {} (Score: {:.1}, Avg Latency: {}ms)",
                 best.mirror_id, best.mirror_name, best.quality_score, best.average_latency_ms
             );
-        } else {
             println!(
-                "⚠️ Best Available (Partial): [{}] {} (Score: {:.1}, Avg Latency: {}ms - some endpoints offline)",
-                best.mirror_id, best.mirror_name, best.quality_score, best.average_latency_ms
+                "     To activate this mirror, run: pdown use {}\n",
+                best.mirror_id
             );
         }
+    } else if let Some(best) = summaries.iter().find(|s| s.partially_reachable) {
         println!(
-            "   To activate this mirror, run: pdown use {}\n",
+            "   • Best Available (Partial): [{}] {} (Score: {:.1}, Avg Latency: {}ms - some endpoints offline)",
+            best.mirror_id, best.mirror_name, best.quality_score, best.average_latency_ms
+        );
+        println!(
+            "     To activate this mirror, run: pdown use {}\n",
             best.mirror_id
         );
+    } else {
+        println!("   • Overall: No healthy mirrors found\n");
     }
+
+    if let Some(ref f) = recommendations.best_for_flutter {
+        println!("   • Best for Flutter:     [{}]", f);
+    }
+    if let Some(ref d) = recommendations.best_for_dart {
+        println!("   • Best for Dart / Pub:  [{}]", d);
+    }
+    if let Some(ref g) = recommendations.best_for_gradle {
+        println!("   • Best for Gradle:      [{}]", g);
+    }
+    println!();
 
     Ok(())
 }

@@ -1,0 +1,18 @@
+# Set default behavior, in case users don't have core.autocrlf set.
+* text=auto
+
+# Cryptographically signed artifacts and schemas MUST maintain exact byte LF line endings on all platforms
+registry/mirrors.json text eol=lf
+registry/mirrors.json.sig text eol=lf
+registry/schema.json text eol=lf
+
+# Rust source files and manifests
+*.rs text eol=lf
+Cargo.toml text eol=lf
+Cargo.lock text eol=lf
+
+# Shell scripts must use LF
+*.sh text eol=lf
+
+# Windows PowerShell scripts
+*.ps1 text eol=crlf

@@ -183,3 +183,110 @@ fn test_semantic_validation_rejects_dangerous_urls() {
     let err_str = res.err().unwrap().to_string();
     assert!(err_str.contains("invalid URL scheme"));
 }
+
+#[test]
+fn test_canonical_mirrors_json_has_exact_lf_endings() {
+    let bytes = include_bytes!("../registry/mirrors.json");
+    assert!(
+        !bytes.contains(&b'\r'),
+        "registry/mirrors.json must have exact LF line endings with zero CR characters"
+    );
+}
+
+#[test]
+fn test_persistent_state_corruption_triggers_safe_recovery() {
+    let tmp = tempdir().unwrap();
+    let storage = StorageManager::with_custom_root(tmp.path());
+    storage.ensure_dirs().unwrap();
+    let manager = RegistryManager::new(storage.clone());
+
+    let state_path = storage.registry_state_path();
+    std::fs::write(&state_path, b"INVALID_CORRUPTED_JSON_DATA{{{").unwrap();
+
+    // Calling load_persistent_state must not fail and must safely recover
+    let state = manager
+        .load_persistent_state()
+        .expect("Must safely recover from corrupted state");
+    let bundled = manager.load_bundled().unwrap();
+    assert!(state.highest_accepted_revision >= bundled.revision);
+}
+
+#[test]
+fn test_persistent_state_recovers_from_existing_generations() {
+    let tmp = tempdir().unwrap();
+    let storage = StorageManager::with_custom_root(tmp.path());
+    storage.ensure_dirs().unwrap();
+
+    let (pubkey, privkey) = generate_keypair();
+    let manager = RegistryManager::with_custom_endpoints(
+        storage.clone(),
+        "http://unused".into(),
+        "http://unused".into(),
+        pubkey,
+    );
+
+    // Create a verified generation with revision 42
+    let mut doc: RegistryDocument =
+        serde_json::from_str(include_str!("../registry/mirrors.json")).unwrap();
+    doc.revision = 42;
+    let doc_bytes = serde_json::to_vec_pretty(&doc).unwrap();
+    let sig = sign_payload(&doc_bytes, &privkey);
+
+    let gen_id = "gen_42_test";
+    let gen_dir = storage.registry_generations_dir().join(gen_id);
+    std::fs::create_dir_all(&gen_dir).unwrap();
+    std::fs::write(gen_dir.join("mirrors.json"), &doc_bytes).unwrap();
+    std::fs::write(gen_dir.join("mirrors.json.sig"), &sig).unwrap();
+
+    // Corrupt state file
+    std::fs::write(storage.registry_state_path(), b"MALFORMED_STATE").unwrap();
+
+    // Recovered state must detect the on-disk generation with revision 42
+    let recovered = manager.load_persistent_state().unwrap();
+    assert_eq!(recovered.highest_accepted_revision, 42);
+    assert_eq!(recovered.active_generation, Some(gen_id.to_string()));
+}
+
+#[test]
+fn test_load_cached_rejects_anti_rollback_violation() {
+    let tmp = tempdir().unwrap();
+    let storage = StorageManager::with_custom_root(tmp.path());
+    storage.ensure_dirs().unwrap();
+
+    let (pubkey, privkey) = generate_keypair();
+    let manager = RegistryManager::with_custom_endpoints(
+        storage.clone(),
+        "http://unused".into(),
+        "http://unused".into(),
+        pubkey,
+    );
+
+    // Create a generation with revision 10
+    let mut doc: RegistryDocument =
+        serde_json::from_str(include_str!("../registry/mirrors.json")).unwrap();
+    doc.revision = 10;
+    let doc_bytes = serde_json::to_vec_pretty(&doc).unwrap();
+    let sig = sign_payload(&doc_bytes, &privkey);
+
+    let gen_id = "gen_10_old";
+    let gen_dir = storage.registry_generations_dir().join(gen_id);
+    std::fs::create_dir_all(&gen_dir).unwrap();
+    std::fs::write(gen_dir.join("mirrors.json"), &doc_bytes).unwrap();
+    std::fs::write(gen_dir.join("mirrors.json.sig"), &sig).unwrap();
+
+    // Set persistent state highest_accepted_revision to 50
+    let state = pdown::core::registry::PersistentRegistryState {
+        highest_accepted_revision: 50,
+        active_generation: Some(gen_id.to_string()),
+        last_known_good_generation: None,
+        last_checked_at: None,
+    };
+    manager.save_persistent_state(&state).unwrap();
+
+    // load_cached must reject gen_10 because 10 < 50
+    let cached = manager.load_cached().unwrap();
+    assert!(
+        cached.is_none(),
+        "Generation with revision 10 must be rejected when highest accepted is 50"
+    );
+}

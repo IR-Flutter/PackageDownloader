@@ -186,3 +186,208 @@ async fn test_benchmark_weighted_scoring_and_unhealthy_ecosystem_penalty() {
         "Partially failing mirror score must be penalized"
     );
 }
+
+#[test]
+fn test_benchmark_recommendations_excludes_disabled_and_unsupported_providers() {
+    let mirror_pub_only = MirrorDefinition {
+        id: "pub-only".into(),
+        name: "Pub Only".into(),
+        description: "Only pub".into(),
+        website: "https://pub.example.com".into(),
+        country: Some("IR".into()),
+        documentation_url: None,
+        provider_type: None,
+        capabilities: vec![],
+        verification: None,
+        last_verified_at: None,
+        limitations: vec![],
+        enabled: true,
+        priority: Some(10),
+        providers: MirrorProviders {
+            flutter: None, // No flutter!
+            dart: Some(DartProviderConfig {
+                enabled: true,
+                hosted_url: Some("https://pub.example.com".into()),
+                test_package: None,
+            }),
+            gradle: None,
+            android: None,
+            ios: None,
+        },
+    };
+
+    let mirror_disabled = MirrorDefinition {
+        id: "disabled-mirror".into(),
+        name: "Disabled Mirror".into(),
+        description: "Disabled".into(),
+        website: "https://disabled.example.com".into(),
+        country: Some("IR".into()),
+        documentation_url: None,
+        provider_type: None,
+        capabilities: vec![],
+        verification: None,
+        last_verified_at: None,
+        limitations: vec![],
+        enabled: false, // Globally disabled!
+        priority: Some(1),
+        providers: MirrorProviders {
+            flutter: Some(FlutterProviderConfig {
+                enabled: true,
+                storage_url: Some("https://disabled.example.com/flutter".into()),
+                test_path: None,
+            }),
+            dart: Some(DartProviderConfig {
+                enabled: true,
+                hosted_url: Some("https://disabled.example.com/dart".into()),
+                test_package: None,
+            }),
+            gradle: None,
+            android: None,
+            ios: None,
+        },
+    };
+
+    let mirror_full = MirrorDefinition {
+        id: "full-mirror".into(),
+        name: "Full Mirror".into(),
+        description: "Full".into(),
+        website: "https://full.example.com".into(),
+        country: Some("IR".into()),
+        documentation_url: None,
+        provider_type: None,
+        capabilities: vec![],
+        verification: None,
+        last_verified_at: None,
+        limitations: vec![],
+        enabled: true,
+        priority: Some(20),
+        providers: MirrorProviders {
+            flutter: Some(FlutterProviderConfig {
+                enabled: true,
+                storage_url: Some("https://full.example.com/flutter".into()),
+                test_path: None,
+            }),
+            dart: Some(DartProviderConfig {
+                enabled: true,
+                hosted_url: Some("https://full.example.com/dart".into()),
+                test_package: None,
+            }),
+            gradle: None,
+            android: None,
+            ios: None,
+        },
+    };
+
+    let summaries = vec![
+        MirrorBenchmarkSummary {
+            mirror_id: "pub-only".into(),
+            mirror_name: "Pub Only".into(),
+            overall_reachable: true,
+            partially_reachable: false,
+            average_latency_ms: 20,
+            quality_score: 95.0,
+            success_rate: 1.0,
+            probes: vec![BenchmarkProbeResult {
+                provider_id: "dart".into(),
+                endpoint_url: "https://pub.example.com".into(),
+                reachable: true,
+                http_status: Some(200),
+                dns_ms: None,
+                tcp_ms: None,
+                tls_ms: None,
+                total_latency_ms: 20,
+                bytes_transferred: Some(1024),
+                throughput_kbps: Some(2000.0),
+                error: None,
+            }],
+        },
+        MirrorBenchmarkSummary {
+            mirror_id: "disabled-mirror".into(),
+            mirror_name: "Disabled Mirror".into(),
+            overall_reachable: true,
+            partially_reachable: false,
+            average_latency_ms: 10,
+            quality_score: 99.0,
+            success_rate: 1.0,
+            probes: vec![
+                BenchmarkProbeResult {
+                    provider_id: "dart".into(),
+                    endpoint_url: "https://disabled.example.com/dart".into(),
+                    reachable: true,
+                    http_status: Some(200),
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms: 10,
+                    bytes_transferred: Some(1024),
+                    throughput_kbps: Some(3000.0),
+                    error: None,
+                },
+                BenchmarkProbeResult {
+                    provider_id: "flutter".into(),
+                    endpoint_url: "https://disabled.example.com/flutter".into(),
+                    reachable: true,
+                    http_status: Some(200),
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms: 10,
+                    bytes_transferred: Some(1024),
+                    throughput_kbps: Some(3000.0),
+                    error: None,
+                },
+            ],
+        },
+        MirrorBenchmarkSummary {
+            mirror_id: "full-mirror".into(),
+            mirror_name: "Full Mirror".into(),
+            overall_reachable: true,
+            partially_reachable: false,
+            average_latency_ms: 50,
+            quality_score: 90.0,
+            success_rate: 1.0,
+            probes: vec![
+                BenchmarkProbeResult {
+                    provider_id: "dart".into(),
+                    endpoint_url: "https://full.example.com/dart".into(),
+                    reachable: true,
+                    http_status: Some(200),
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms: 50,
+                    bytes_transferred: Some(1024),
+                    throughput_kbps: Some(1000.0),
+                    error: None,
+                },
+                BenchmarkProbeResult {
+                    provider_id: "flutter".into(),
+                    endpoint_url: "https://full.example.com/flutter".into(),
+                    reachable: true,
+                    http_status: Some(200),
+                    dns_ms: None,
+                    tcp_ms: None,
+                    tls_ms: None,
+                    total_latency_ms: 50,
+                    bytes_transferred: Some(1024),
+                    throughput_kbps: Some(1000.0),
+                    error: None,
+                },
+            ],
+        },
+    ];
+
+    let mirrors = vec![mirror_pub_only, mirror_disabled, mirror_full];
+    let rec = BenchmarkEngine::compute_recommendations(&summaries, &mirrors);
+
+    // 1. Disabled mirror must never be recommended anywhere
+    assert_ne!(rec.best_overall.as_deref(), Some("disabled-mirror"));
+    assert_ne!(rec.best_for_dart.as_deref(), Some("disabled-mirror"));
+    assert_ne!(rec.best_for_flutter.as_deref(), Some("disabled-mirror"));
+
+    // 2. pub-only has faster dart (20ms) than full-mirror (50ms)
+    assert_eq!(rec.best_for_dart.as_deref(), Some("pub-only"));
+
+    // 3. pub-only DOES NOT support flutter, so full-mirror must be recommended for flutter
+    assert_eq!(rec.best_for_flutter.as_deref(), Some("full-mirror"));
+}

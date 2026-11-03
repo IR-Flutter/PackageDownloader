@@ -9,7 +9,7 @@ Write-Host "================================================================" -F
 Write-Host "🚀 Installing PackageDownloader 2.0 (pdown) for Windows..." -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
 
-$ReleaseTag = "v2.0.0"
+$ReleaseTag = "v2.0.1"
 try {
     $Response = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
     if ($Response.tag_name) {

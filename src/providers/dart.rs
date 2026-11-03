@@ -61,23 +61,32 @@ impl Provider for DartProvider {
         })?;
 
         let mut items = Vec::new();
-        let shell_files = EnvironmentManager::get_unix_shell_files();
+        if cfg!(target_os = "windows") {
+            let old_value = EnvironmentManager::get_var(KEY_PUB_HOSTED_URL);
+            items.push(crate::core::models::ChangeItem::EnvironmentSet {
+                key: KEY_PUB_HOSTED_URL.to_string(),
+                old_value,
+                new_value: hosted_url.to_string(),
+            });
+        } else {
+            let shell_files = EnvironmentManager::get_unix_shell_files();
 
-        // Include current flutter storage url if set
-        let flutter_val = EnvironmentManager::get_var("FLUTTER_STORAGE_BASE_URL");
-        let mut vars = vec![(KEY_PUB_HOSTED_URL, hosted_url)];
-        if let Some(ref f) = flutter_val {
-            vars.push(("FLUTTER_STORAGE_BASE_URL", f.as_str()));
-        }
+            // Include current flutter storage url if set
+            let flutter_val = EnvironmentManager::get_var("FLUTTER_STORAGE_BASE_URL");
+            let mut vars = vec![(KEY_PUB_HOSTED_URL, hosted_url)];
+            if let Some(ref f) = flutter_val {
+                vars.push(("FLUTTER_STORAGE_BASE_URL", f.as_str()));
+            }
 
-        for file in shell_files {
-            let item = EnvironmentManager::plan_unix_file_update(
-                &file,
-                MARKER_START_FLUTTER_DART,
-                MARKER_END_FLUTTER_DART,
-                &vars,
-            )?;
-            items.push(item);
+            for file in shell_files {
+                let item = EnvironmentManager::plan_unix_file_update(
+                    &file,
+                    MARKER_START_FLUTTER_DART,
+                    MARKER_END_FLUTTER_DART,
+                    &vars,
+                )?;
+                items.push(item);
+            }
         }
 
         Ok(ChangePlan {
@@ -89,15 +98,23 @@ impl Provider for DartProvider {
 
     fn plan_revert(&self) -> Result<ChangePlan> {
         let mut items = Vec::new();
-        let shell_files = EnvironmentManager::get_unix_shell_files();
+        if cfg!(target_os = "windows") {
+            let old_value = EnvironmentManager::get_var(KEY_PUB_HOSTED_URL);
+            items.push(crate::core::models::ChangeItem::EnvironmentUnset {
+                key: KEY_PUB_HOSTED_URL.to_string(),
+                old_value,
+            });
+        } else {
+            let shell_files = EnvironmentManager::get_unix_shell_files();
 
-        for file in shell_files {
-            if let Some(item) = EnvironmentManager::plan_unix_file_revert(
-                &file,
-                MARKER_START_FLUTTER_DART,
-                MARKER_END_FLUTTER_DART,
-            )? {
-                items.push(item);
+            for file in shell_files {
+                if let Some(item) = EnvironmentManager::plan_unix_file_revert(
+                    &file,
+                    MARKER_START_FLUTTER_DART,
+                    MARKER_END_FLUTTER_DART,
+                )? {
+                    items.push(item);
+                }
             }
         }
 

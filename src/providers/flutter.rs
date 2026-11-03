@@ -64,23 +64,32 @@ impl Provider for FlutterProvider {
         })?;
 
         let mut items = Vec::new();
-        let shell_files = EnvironmentManager::get_unix_shell_files();
+        if cfg!(target_os = "windows") {
+            let old_value = EnvironmentManager::get_var(KEY_FLUTTER_STORAGE_URL);
+            items.push(crate::core::models::ChangeItem::EnvironmentSet {
+                key: KEY_FLUTTER_STORAGE_URL.to_string(),
+                old_value,
+                new_value: storage_url.to_string(),
+            });
+        } else {
+            let shell_files = EnvironmentManager::get_unix_shell_files();
 
-        // Preserve current pub hosted url if set
-        let pub_val = EnvironmentManager::get_var("PUB_HOSTED_URL");
-        let mut vars = vec![(KEY_FLUTTER_STORAGE_URL, storage_url)];
-        if let Some(ref p) = pub_val {
-            vars.push(("PUB_HOSTED_URL", p.as_str()));
-        }
+            // Preserve current pub hosted url if set
+            let pub_val = EnvironmentManager::get_var("PUB_HOSTED_URL");
+            let mut vars = vec![(KEY_FLUTTER_STORAGE_URL, storage_url)];
+            if let Some(ref p) = pub_val {
+                vars.push(("PUB_HOSTED_URL", p.as_str()));
+            }
 
-        for file in shell_files {
-            let item = EnvironmentManager::plan_unix_file_update(
-                &file,
-                MARKER_START_FLUTTER_DART,
-                MARKER_END_FLUTTER_DART,
-                &vars,
-            )?;
-            items.push(item);
+            for file in shell_files {
+                let item = EnvironmentManager::plan_unix_file_update(
+                    &file,
+                    MARKER_START_FLUTTER_DART,
+                    MARKER_END_FLUTTER_DART,
+                    &vars,
+                )?;
+                items.push(item);
+            }
         }
 
         Ok(ChangePlan {
@@ -92,15 +101,23 @@ impl Provider for FlutterProvider {
 
     fn plan_revert(&self) -> Result<ChangePlan> {
         let mut items = Vec::new();
-        let shell_files = EnvironmentManager::get_unix_shell_files();
+        if cfg!(target_os = "windows") {
+            let old_value = EnvironmentManager::get_var(KEY_FLUTTER_STORAGE_URL);
+            items.push(crate::core::models::ChangeItem::EnvironmentUnset {
+                key: KEY_FLUTTER_STORAGE_URL.to_string(),
+                old_value,
+            });
+        } else {
+            let shell_files = EnvironmentManager::get_unix_shell_files();
 
-        for file in shell_files {
-            if let Some(item) = EnvironmentManager::plan_unix_file_revert(
-                &file,
-                MARKER_START_FLUTTER_DART,
-                MARKER_END_FLUTTER_DART,
-            )? {
-                items.push(item);
+            for file in shell_files {
+                if let Some(item) = EnvironmentManager::plan_unix_file_revert(
+                    &file,
+                    MARKER_START_FLUTTER_DART,
+                    MARKER_END_FLUTTER_DART,
+                )? {
+                    items.push(item);
+                }
             }
         }
 

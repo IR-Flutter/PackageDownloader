@@ -260,7 +260,9 @@
         "dart",
         "flutter"
       ],
-      "limitations": [],
+      "limitations": [
+        "International CDN latency: traffic routes to mainland China servers, which may experience variable latency or peering degradation from outside China"
+      ],
       "providers": {
         "flutter": {
           "enabled": true,
@@ -432,7 +434,7 @@
       "country": "US",
       "provider_type": "upstream",
       "documentation_url": "https://pub.dev",
-      "verification": "verified",
+      "verification": "upstream_reference",
       "last_verified_at": "2026-11-03T10:28:00Z",
       "capabilities": [
         "dart",
@@ -442,7 +444,9 @@
         "gradle_plugins",
         "gradle_distributions"
       ],
-      "limitations": [],
+      "limitations": [
+        "Reference upstream endpoints; subject to geographic sanctions or network blocks when accessed from restricted networks"
+      ],
       "providers": {
         "flutter": {
           "enabled": true,

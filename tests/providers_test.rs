@@ -167,3 +167,27 @@ zipStorePath=wrapper/dists\n",
         panic!("Expected FileWrite on revert");
     }
 }
+
+#[test]
+fn test_gradle_init_script_routing_and_jitpack_preservation() {
+    let script = GradleProvider::render_init_script(
+        Some("https://mirror-maven.runflare.com/maven2/"),
+        Some("https://mirror-maven.runflare.com/google/"),
+        Some("https://mirror-maven.runflare.com/plugins/"),
+    );
+
+    // Verify rewrite targets
+    assert!(script.contains("https://repo.maven.apache.org/maven2/"));
+    assert!(script.contains("https://dl.google.com/dl/android/maven2/"));
+    assert!(script.contains("https://plugins.gradle.org/m2/"));
+
+    // Verify modern settings-evaluated blocks for pluginManagement and dependencyResolutionManagement
+    assert!(script.contains("settings.pluginManagement?.repositories"));
+    assert!(script.contains("settings.dependencyResolutionManagement?.repositories"));
+    assert!(script.contains("buildscript"));
+    assert!(script.contains("gradle.allprojects"));
+
+    // Verify it only targets exact Maven Central, Google Maven, and Gradle Plugins URLs
+    // JitPack (https://jitpack.io) and custom repositories are NOT rewritten
+    assert!(!script.contains("jitpack.io"));
+}

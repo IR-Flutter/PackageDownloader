@@ -126,12 +126,15 @@ In accordance with Section 5 of the production specification, every candidate mi
 - **Website:** `https://flutter.cn`
 - **Country:** CN (China)
 - **Provider Type:** Community & International Mirror
-- **Verification Status:** **Verified**
+- **Verification Status:** **Verified (with Latency Limitation)**
 
 | Capability / Endpoint | Test URL | Result | TTFB / Total | Status | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Dart Pub** | `https://pub.flutter-io.cn/api/packages/http` | HTTP 200 | 1854 ms | **Verified** | Official international community pub mirror |
 | **Flutter Storage** | `https://storage.flutter-io.cn/...` | HTTP 200 | 2162 ms | **Verified** | Official international Flutter SDK mirror |
+
+> [!NOTE]
+> **International CDN Peering:** Traffic routes to servers in mainland China, which may exhibit variable latency or packet loss depending on international peering from Iran. Documented as a known limitation in `registry/mirrors.json`.
 
 ---
 
@@ -151,6 +154,25 @@ In accordance with Section 5 of the production specification, every candidate mi
 
 > [!CAUTION]
 > **Action Taken:** `novin` has been configured with `"enabled": false` across all providers in `registry/mirrors.json` to prevent broken builds.
+
+---
+
+### 3.8 Official Upstream Reference (`official`)
+- **Website:** `https://pub.dev`
+- **Country:** US
+- **Provider Type:** Upstream Reference
+- **Verification Status:** **Upstream Reference (`upstream_reference`)**
+
+| Capability / Endpoint | Test URL | Result | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dart Pub** | `https://pub.dev/api/packages/http` | HTTP 200 | **Upstream Reference** | Canonical Google Dart pub repository |
+| **Flutter Storage** | `https://storage.googleapis.com/...` | HTTP 200 | **Upstream Reference** | Canonical Google Cloud Storage bucket |
+| **Maven Central** | `https://repo.maven.apache.org/maven2/...` | HTTP 200 | **Upstream Reference** | Canonical Apache Maven repository |
+| **Google Maven** | `https://dl.google.com/dl/android/maven2/...` | HTTP 200 | **Upstream Reference** | Canonical Google Android repository |
+| **Gradle Distributions**| `https://services.gradle.org/distributions/...`| HTTP 200 | **Upstream Reference** | Canonical Gradle distribution portal |
+
+> [!NOTE]
+> `official` serves as the baseline upstream reference configuration in `mirrors.json`. It is categorized as `upstream_reference` rather than an operational regional mirror because upstream endpoints are subject to sanctions or network access restrictions from within Iran.
 
 ---
 

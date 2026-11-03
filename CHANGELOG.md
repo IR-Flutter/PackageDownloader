@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-11-03
+
+### Fixed
+- **Anti-Rollback State Integrity (P0-1):**
+  - Resolved silent fallback to bundled baseline on persistent state corruption (`registry_state.json`). Implemented safe recovery (`recover_persistent_state`) reconstructing monotonic state from verified on-disk generations without weakening revision boundaries.
+  - Enforced `highest_accepted_revision` across all cache generations and legacy fallback.
+- **Registry Signing Pipeline (P0-2):**
+  - Resolved circular testing dependency in `.github/workflows/registry-signing.yml` by adding `--validate-only` schema and semantics check mode to `sign_registry`.
+  - Fixed step-level secret environment variable evaluation in signing condition; workflow now fails closed if `REGISTRY_SIGNING_PRIVATE_KEY` is not configured.
+  - Replaced silent `continue-on-error: true` with structured informational endpoint probing and logging.
+- **Windows CRLF Checkout Line Ending Normalization (P0-3):**
+  - Configured repository `.gitattributes` enforcing `text eol=lf` across all registry JSON, signatures, Rust source code, and shell scripts, preventing Windows git checkout CRLF byte alterations.
+- **Windows Environment Variable Error Handling (P0-4):**
+  - Replaced unverified command execution with strict exit code checks, stderr capture, and variable name/value validation (`validate_env_var_name`, `validate_env_var_value`) in `EnvironmentManager`.
+  - Wired `EnvironmentSet` and `EnvironmentUnset` change items into the transactional execution engine with reversible rollback actions (`RollbackAction::RevertEnvironment`).
+- **Global Mirror Enabled Enforcement (P1-1):**
+  - Strictly enforced `mirror.enabled` filtering across `list_mirrors`, `find_mirror`, `handle_use`, and benchmark recommendations.
+- **Registry Verification Consistency (P1-2):**
+  - Extended `registry/schema.json` with `upstream_reference` verification type and updated `official` baseline.
+  - Documented international CDN latency considerations for `flutter-cn`.
+- **Benchmark Multi-Sample Probes & Recommendations (P1-3):**
+  - Implemented multi-sample probes in `BenchmarkEngine` to smooth out network jitter and separate transfer throughput from handshake latency.
+  - Added automated per-ecosystem recommendations (`best_for_flutter`, `best_for_dart`, `best_for_gradle`).
+  - Guaranteed that mirrors with disabled ecosystem providers are never recommended for that ecosystem.
+- **Gradle Routing & Custom Repository Preservation (P1-4):**
+  - Verified preservation of JitPack (`https://jitpack.io`) and custom internal repositories in Gradle init.d scripts.
+- **CI/CD Supply-Chain Hardening (P2-1):**
+  - Pinned all third-party GitHub Actions to immutable 40-character commit SHAs.
+  - Enforced mandatory cross-platform quality gate matrix (Linux, macOS, Windows) prior to release compilation.
+
+---
+
 ## [2.0.0] - 2026-11-03
 
 ### Added

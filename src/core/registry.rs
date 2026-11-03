@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 pub const CANONICAL_REGISTRY_URL: &str =
@@ -92,25 +92,130 @@ impl RegistryManager {
         }
     }
 
-    /// Load or initialize persistent anti-rollback and generation tracking state.
-    pub fn load_persistent_state(&self) -> Result<PersistentRegistryState> {
-        let state_path = self.storage.registry_state_path();
-        if state_path.exists() {
-            if let Ok(bytes) = fs::read(&state_path) {
-                if let Ok(state) = serde_json::from_slice::<PersistentRegistryState>(&bytes) {
-                    return Ok(state);
+    /// Attempt explicit recovery of persistent state by inspecting valid verified generations on disk.
+    /// Never silently lowers the trusted revision below verified on-disk generations or the bundled baseline.
+    pub fn recover_persistent_state(&self) -> Result<PersistentRegistryState> {
+        let bundled: RegistryDocument = serde_json::from_str(BUNDLED_REGISTRY_JSON)?;
+        let mut highest_rev = bundled.revision;
+        let mut valid_generations: Vec<(u64, String, std::time::SystemTime)> = Vec::new();
+
+        let generations_root = self.storage.registry_generations_dir();
+        if generations_root.exists() {
+            if let Ok(entries) = fs::read_dir(&generations_root) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let gen_id = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if gen_id.ends_with(".staging") {
+                            // Clean up unactivated staging directories
+                            let _ = fs::remove_dir_all(&path);
+                            continue;
+                        }
+                        if let Ok(Some(doc)) = self.load_generation_from_dir(&path) {
+                            let mtime = entry
+                                .metadata()
+                                .and_then(|m| m.modified())
+                                .unwrap_or(std::time::UNIX_EPOCH);
+                            if doc.revision > highest_rev {
+                                highest_rev = doc.revision;
+                            }
+                            valid_generations.push((doc.revision, gen_id, mtime));
+                        }
+                    }
                 }
             }
         }
 
-        // Initialize state tracking using bundled registry revision as baseline
+        // Sort valid generations: primary by revision ascending, secondary by mtime ascending
+        valid_generations.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.2.cmp(&b.2)));
+
+        let active_gen = valid_generations.last().map(|g| g.1.clone());
+        let lkg_gen = if valid_generations.len() >= 2 {
+            Some(valid_generations[valid_generations.len() - 2].1.clone())
+        } else {
+            None
+        };
+
+        let recovered_state = PersistentRegistryState {
+            highest_accepted_revision: highest_rev,
+            active_generation: active_gen,
+            last_known_good_generation: lkg_gen,
+            last_checked_at: Some(Utc::now()),
+        };
+
+        self.save_persistent_state(&recovered_state)?;
+        warn!(
+            "State recovery completed safely: highest_accepted_revision={}, active_gen={:?}",
+            highest_rev, recovered_state.active_generation
+        );
+        Ok(recovered_state)
+    }
+
+    /// Load or initialize persistent anti-rollback and generation tracking state.
+    /// Corrupted, unreadable, or missing states trigger explicit safe recovery rather than silently weakening anti-rollback.
+    pub fn load_persistent_state(&self) -> Result<PersistentRegistryState> {
+        let state_path = self.storage.registry_state_path();
+        if !state_path.exists() {
+            // Check if generations already exist on disk before defaulting to bundled baseline
+            let generations_root = self.storage.registry_generations_dir();
+            if generations_root.exists() {
+                if let Ok(entries) = fs::read_dir(&generations_root) {
+                    let has_dirs = entries.flatten().any(|e| e.path().is_dir());
+                    if has_dirs {
+                        info!(
+                            "State file missing but generations exist on disk. Recovering state..."
+                        );
+                        return self.recover_persistent_state();
+                    }
+                }
+            }
+
+            // Clean initial install with no prior generations: baseline to bundled revision
+            let bundled: RegistryDocument = serde_json::from_str(BUNDLED_REGISTRY_JSON)?;
+            return Ok(PersistentRegistryState {
+                highest_accepted_revision: bundled.revision,
+                active_generation: None,
+                last_known_good_generation: None,
+                last_checked_at: None,
+            });
+        }
+
+        let bytes = fs::read(&state_path).map_err(|e| {
+            PdownError::RegistryValidation(format!(
+                "Persistent registry state file exists at '{}' but could not be read: {e}",
+                state_path.display()
+            ))
+        })?;
+
+        let state = match serde_json::from_slice::<PersistentRegistryState>(&bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                error!(
+                    "Persistent registry state at '{}' is corrupted ({e}). Initiating explicit safe recovery...",
+                    state_path.display()
+                );
+                return self.recover_persistent_state();
+            }
+        };
+
+        // Enforce that state revision can never be lower than the bundled immutable baseline
         let bundled: RegistryDocument = serde_json::from_str(BUNDLED_REGISTRY_JSON)?;
-        Ok(PersistentRegistryState {
-            highest_accepted_revision: bundled.revision,
-            active_generation: None,
-            last_known_good_generation: None,
-            last_checked_at: None,
-        })
+        if state.highest_accepted_revision < bundled.revision {
+            warn!(
+                "Persistent state revision ({}) is lower than bundled baseline ({}). Advancing to bundled revision.",
+                state.highest_accepted_revision, bundled.revision
+            );
+            let mut corrected = state;
+            corrected.highest_accepted_revision = bundled.revision;
+            self.save_persistent_state(&corrected)?;
+            return Ok(corrected);
+        }
+
+        Ok(state)
     }
 
     /// Persist the anti-rollback state atomically.
@@ -144,68 +249,99 @@ impl RegistryManager {
     }
 
     /// Load and validate cached registry generation if present.
-    /// Supports generation directories, automatic recovery from last-known-good, and exact byte verification.
+    /// Strictly validates all loaded generations against the persistent anti-rollback policy.
     pub fn load_cached(&self) -> Result<Option<RegistryDocument>> {
         let state = self.load_persistent_state()?;
+        let bundled = self.load_bundled()?;
 
         // 1. Try loading from active generation directory
         if let Some(ref gen_id) = state.active_generation {
             let gen_dir = self.storage.registry_generations_dir().join(gen_id);
             if let Ok(Some(doc)) = self.load_generation_from_dir(&gen_dir) {
-                return Ok(Some(doc));
+                // Strictly enforce anti-rollback policy on active generation
+                if doc.revision >= state.highest_accepted_revision {
+                    return Ok(Some(doc));
+                }
+                warn!(
+                    "Active generation '{gen_id}' revision ({}) violates anti-rollback policy (highest_accepted: {}). Discarding active generation.",
+                    doc.revision, state.highest_accepted_revision
+                );
             }
-            warn!("Active generation '{gen_id}' is missing or corrupted. Attempting recovery to last known good...");
+            warn!("Active generation '{gen_id}' is missing, invalid, or violates anti-rollback policy. Attempting recovery to last known good...");
 
             // 2. Try loading from last-known-good generation directory
             if let Some(ref lkg_id) = state.last_known_good_generation {
                 let lkg_dir = self.storage.registry_generations_dir().join(lkg_id);
                 if let Ok(Some(doc)) = self.load_generation_from_dir(&lkg_dir) {
-                    info!("Successfully recovered registry from last-known-good generation '{lkg_id}'");
-                    let mut updated_state = state.clone();
-                    updated_state.active_generation = Some(lkg_id.clone());
-                    let _ = self.save_persistent_state(&updated_state);
-                    return Ok(Some(doc));
+                    if doc.revision >= bundled.revision {
+                        info!("Successfully recovered registry from last-known-good generation '{lkg_id}'");
+                        let mut updated_state = state.clone();
+                        updated_state.active_generation = Some(lkg_id.clone());
+                        let _ = self.save_persistent_state(&updated_state);
+                        return Ok(Some(doc));
+                    }
                 }
             }
         }
 
-        // 3. Fallback to direct cache files if present (backwards compatibility)
+        // 3. Safe migration of legacy unversioned cache files if present
         let cache_path = self.storage.cached_registry_path();
         let sig_path = self.storage.cached_signature_path();
 
-        if !cache_path.exists() || !sig_path.exists() {
-            return Ok(None);
-        }
-
-        let content = fs::read(&cache_path)?;
-        let signature_str = fs::read_to_string(&sig_path)?;
-
-        // Verify cryptographic signature against exact persisted bytes
-        if let Err(e) = verify_signature(&content, &signature_str, &self.public_key_b64) {
-            warn!("Cached registry signature verification failed: {e}. Discarding cache.");
-            return Ok(None);
-        }
-
-        // Validate JSON Schema
-        if let Err(e) = Self::validate_json_schema(&content) {
-            warn!("Cached registry JSON Schema validation failed: {e}. Discarding cache.");
-            return Ok(None);
-        }
-
-        let doc: RegistryDocument = match serde_json::from_slice(&content) {
-            Ok(d) => d,
-            Err(e) => {
-                warn!("Cached registry is malformed JSON: {e}. Discarding cache.");
-                return Ok(None);
+        if cache_path.exists() && sig_path.exists() {
+            if let Ok(content) = fs::read(&cache_path) {
+                if let Ok(signature_str) = fs::read_to_string(&sig_path) {
+                    if verify_signature(&content, &signature_str, &self.public_key_b64).is_ok()
+                        && Self::validate_json_schema(&content).is_ok()
+                    {
+                        if let Ok(doc) = serde_json::from_slice::<RegistryDocument>(&content) {
+                            if Self::validate_semantics(&doc).is_ok() {
+                                if doc.revision >= state.highest_accepted_revision {
+                                    info!(
+                                        "Migrating legacy cache (revision {}) into generation storage...",
+                                        doc.revision
+                                    );
+                                    let gen_id = format!(
+                                        "gen_{}_{}",
+                                        doc.revision,
+                                        &uuid::Uuid::new_v4().to_string()[..8]
+                                    );
+                                    let gen_dir =
+                                        self.storage.registry_generations_dir().join(&gen_id);
+                                    if fs::create_dir_all(&gen_dir).is_ok() {
+                                        let _ = fs::write(gen_dir.join("mirrors.json"), &content);
+                                        let _ = fs::write(
+                                            gen_dir.join("mirrors.json.sig"),
+                                            signature_str.trim().as_bytes(),
+                                        );
+                                        let mut updated_state = state.clone();
+                                        updated_state.active_generation = Some(gen_id);
+                                        updated_state.highest_accepted_revision = std::cmp::max(
+                                            updated_state.highest_accepted_revision,
+                                            doc.revision,
+                                        );
+                                        let _ = self.save_persistent_state(&updated_state);
+                                        let _ = fs::remove_file(&cache_path);
+                                        let _ = fs::remove_file(&sig_path);
+                                        return Ok(Some(doc));
+                                    }
+                                } else {
+                                    warn!(
+                                        "Legacy cache revision ({}) violates anti-rollback policy (highest_accepted: {}). Discarding legacy cache.",
+                                        doc.revision, state.highest_accepted_revision
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        };
-
-        if let Err(e) = Self::validate_semantics(&doc) {
-            warn!("Cached registry semantic validation failed: {e}. Discarding cache.");
-            return Ok(None);
+            // Discard invalid or rejected legacy cache files
+            let _ = fs::remove_file(&cache_path);
+            let _ = fs::remove_file(&sig_path);
         }
 
-        Ok(Some(doc))
+        Ok(None)
     }
 
     fn load_generation_from_dir(&self, dir: &Path) -> Result<Option<RegistryDocument>> {
@@ -412,11 +548,13 @@ impl RegistryManager {
     }
 
     /// List all mirrors, optionally filtering by ecosystem capability.
+    /// Excludes mirrors that are globally disabled (`enabled == false`).
     pub fn list_mirrors(&self, provider_filter: Option<&str>) -> Result<Vec<MirrorDefinition>> {
         let doc = self.load_active()?;
         let mut mirrors: Vec<MirrorDefinition> = doc
             .mirrors
             .into_iter()
+            .filter(|m| m.enabled)
             .filter(|m| {
                 if let Some(filter) = provider_filter {
                     match filter.to_lowercase().as_str() {

@@ -28,6 +28,18 @@ fn main() -> Result<()> {
     RegistryManager::validate_semantics(&doc)
         .context("registry/mirrors.json failed semantic validation")?;
 
+    let args: Vec<String> = env::args().collect();
+    if args
+        .iter()
+        .any(|a| a == "--validate-only" || a == "--check")
+    {
+        println!(
+            "✅ Validation passed: registry/mirrors.json satisfies JSON Schema and semantic constraints (revision {}).",
+            doc.revision
+        );
+        return Ok(());
+    }
+
     // 3. Obtain signing key from environment or file argument
     let key_b64 = match env::var("REGISTRY_SIGNING_PRIVATE_KEY") {
         Ok(k) if !k.trim().is_empty() => k.trim().to_string(),
