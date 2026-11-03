@@ -15,10 +15,7 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Some(Commands::Mirror(args)) => handle_mirror(&registry, args, cli.json).await,
         Some(Commands::Registry(args)) => handle_registry(&registry, args, cli.json).await,
         Some(Commands::Status(args)) => handle_status(args, cli.json).await,
-        Some(Commands::Test(_args)) => {
-            println!("pdown test - available in Phase 5");
-            Ok(())
-        }
+        Some(Commands::Test(args)) => handle_test(&registry, args, cli.json).await,
         Some(Commands::Use(args)) => handle_use(&registry, &storage, args, cli.json).await,
         Some(Commands::Reset(args)) => handle_reset(&storage, args, cli.json).await,
         Some(Commands::Doctor(_args)) => {
@@ -267,6 +264,74 @@ async fn handle_reset(
             report.successful_providers.join(", ")
         );
         println!("   Files updated:   {}", report.modified_files.len());
+    }
+
+    Ok(())
+}
+
+async fn handle_test(
+    registry: &RegistryManager,
+    args: crate::app::cli::TestArgs,
+    json: bool,
+) -> Result<()> {
+    let engine = crate::core::benchmark::BenchmarkEngine::new(args.timeout);
+
+    let mirrors = match args.mirror {
+        Some(id) => {
+            let m = registry
+                .find_mirror(&id)?
+                .ok_or_else(|| PdownError::MirrorNotFound(id))?;
+            vec![m]
+        }
+        None => registry.list_mirrors(None)?,
+    };
+
+    if !json {
+        println!(
+            "\n⚡ Testing Mirror Reachability & Latency (timeout: {}s)...\n",
+            args.timeout
+        );
+    }
+
+    let summaries = engine.benchmark_all(&mirrors).await;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&summaries)?);
+        return Ok(());
+    }
+
+    for s in &summaries {
+        let badge = if s.overall_reachable {
+            format!("✅ ONLINE (avg: {}ms)", s.average_latency_ms)
+        } else {
+            "❌ UNREACHABLE".to_string()
+        };
+
+        println!("🔹 [{}] {} — {}", s.mirror_id, s.mirror_name, badge);
+        for p in &s.probes {
+            let p_badge = if p.reachable {
+                format!(
+                    "{}ms (HTTP {})",
+                    p.total_latency_ms,
+                    p.http_status.unwrap_or(200)
+                )
+            } else {
+                format!("FAILED ({})", p.error.as_deref().unwrap_or("unknown error"))
+            };
+            println!("   • {:<24} -> {}", p.provider_id, p_badge);
+        }
+        println!();
+    }
+
+    if let Some(best) = summaries.iter().find(|s| s.overall_reachable) {
+        println!(
+            "💡 Recommended Mirror: [{}] {} (Average Latency: {}ms)",
+            best.mirror_id, best.mirror_name, best.average_latency_ms
+        );
+        println!(
+            "   To activate this mirror, run: pdown use {}\n",
+            best.mirror_id
+        );
     }
 
     Ok(())

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 5: Mirror Health and Multi-Metric Selection Engine.
+  - Implemented multi-stage health probes: ecosystem-specific payload requests, HTTP status verification, and latency measurement.
+  - Specific probes: `/api/packages/http` (Pub), `releases_linux.json` (Flutter Storage), and real POM XML downloads (Google Maven & Maven Central).
+  - Reproducible ranking and automatic best-mirror recommendation.
+  - Implemented `pdown test [--mirror <id>] [--timeout <secs>] [--json]`.
+  - Integration test in `tests/benchmark_test.rs`.
 - Phase 4: Safe Configuration Engine & Transactions.
   - Implemented transactional apply with automatic LIFO rollback upon partial failure.
   - Snapshot backup engine with SHA-256 integrity verification (`BackupManager`).
