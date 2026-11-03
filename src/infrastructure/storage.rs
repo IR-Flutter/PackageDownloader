@@ -3,6 +3,7 @@ use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone)]
 pub struct StorageManager {
     config_dir: PathBuf,
     data_dir: PathBuf,

@@ -10,6 +10,7 @@ repository = "https://github.com/IR-Flutter/PackageDownloader"
 homepage = "https://ir-flutter.github.io/PackageDownloader/"
 keywords = ["flutter", "dart", "gradle", "mirror", "iran"]
 categories = ["command-line-utilities", "development-tools"]
+default-run = "pdown"
 
 [lib]
 name = "pdown"

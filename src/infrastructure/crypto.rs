@@ -6,7 +6,7 @@ use rand::rngs::OsRng;
 
 /// Embedded trusted Ed25519 public key for verifying registry authenticity.
 /// Base64 encoded 32-byte Ed25519 public key.
-pub const EMBEDDED_REGISTRY_PUBLIC_KEY: &str = "sT8RzM4eI8uF+yEw0F97bXjK5Kk4nQ1+91+9pW0uYc4="; // Default release trust anchor
+pub const EMBEDDED_REGISTRY_PUBLIC_KEY: &str = "H/QvH3DVHuewz11+IEs7W0awXlFgCNoJ/NnSfKJk6Ts="; // Production Ed25519 registry trust anchor
 
 /// Verify an Ed25519 signature over a byte payload.
 pub fn verify_signature(payload: &[u8], signature_b64: &str, public_key_b64: &str) -> Result<()> {
@@ -74,5 +74,15 @@ mod tests {
         // Tamper test
         let tampered = b"tampered registry content";
         assert!(verify_signature(tampered, &sig, &pubkey).is_err());
+    }
+
+    #[test]
+    fn test_verify_canonical_mirrors_json() {
+        let mirrors_bytes = include_bytes!("../../registry/mirrors.json");
+        let sig = include_str!("../../registry/mirrors.json.sig").trim();
+        assert!(verify_signature(mirrors_bytes, sig, EMBEDDED_REGISTRY_PUBLIC_KEY).is_ok());
+
+        // Verification must fail if public key or payload is altered
+        assert!(verify_signature(b"tampered", sig, EMBEDDED_REGISTRY_PUBLIC_KEY).is_err());
     }
 }

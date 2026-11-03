@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 2: Remote Mirror Registry & Cryptographic Verification.
+  - Implemented 3-tier registry resolution: Bundled snapshot, persistent Cache, and Remote GitHub raw endpoint.
+  - Ed25519 digital signature generation and verification (`mirrors.json.sig`).
+  - Monotonic revision comparison to prevent rollback and replay attacks.
+  - Verified mirror catalog: `pub-azs`, `runflare`, `flutter-cn`, `jamko`, `iranserver`, and upstream `official`.
+  - JSON schema draft 2020-12 validation (`registry/schema.json`).
+  - Implemented commands: `pdown list`, `pdown mirror info <id>`, `pdown registry status|check|update`.
+  - Comprehensive unit and integration test suite (`tests/registry_test.rs`).
+  - Documented registry format in `docs/REGISTRY_SPECIFICATION.md` and security in `docs/REGISTRY_SECURITY.md`.
 - Phase 1: Rust architecture and foundation (`package-downloader` v2.0.0).
   - Configured native binaries `pdown` and alias `irflutter`.
   - Comprehensive CLI definition using `clap` (derive).

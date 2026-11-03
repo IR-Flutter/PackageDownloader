@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "revision": 1,
+  "updated_at": "2026-11-03T00:00:00Z",
+  "mirrors": [
+    {
+      "id": "official",
+      "name": "Official Google & Upstream Repositories",
+      "description": "Standard official repositories (pub.dev, storage.googleapis.com, Maven Central, Google Maven)",
+      "website": "https://pub.dev",
+      "enabled": true,
+      "priority": 99,
+      "providers": {
+        "flutter": {
+          "enabled": true,
+          "storage_url": "https://storage.googleapis.com",
+          "test_path": "flutter_infra_release/releases/releases_linux.json"
+        },
+        "dart": {
+          "enabled": true,
+          "hosted_url": "https://pub.dev",
+          "test_package": "http"
+        },
+        "gradle": {
+          "enabled": true,
+          "maven_central_url": "https://repo.maven.apache.org/maven2/",
+          "google_maven_url": "https://dl.google.com/dl/android/maven2/",
+          "gradle_plugins_url": "https://plugins.gradle.org/m2/",
+          "distribution_url": "https://services.gradle.org/distributions/"
+        },
+        "android": {
+          "enabled": true,
+          "google_maven_url": "https://dl.google.com/dl/android/maven2/"
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "Upstream CocoaPods and Swift Package Manager defaults"
+        }
+      }
+    },
+    {
+      "id": "pub-azs",
+      "name": "PUB-AZS Community Mirror",
+      "description": "Verified Dart Pub and Maven/Google Maven dependency proxy in Iran (Flutter storage unsupported)",
+      "website": "https://pub-azs.ir",
+      "enabled": true,
+      "priority": 1,
+      "providers": {
+        "flutter": {
+          "enabled": false,
+          "storage_url": "https://pub-azs.ir",
+          "test_path": "download.flutter.io/io/flutter/flutter_embedding_debug/1.0.0-e672b006cb34c921db85b8e2f482ed3144a4574b/flutter_embedding_debug-1.0.0-e672b006cb34c921db85b8e2f482ed3144a4574b.pom"
+        },
+        "dart": {
+          "enabled": true,
+          "hosted_url": "https://pub-azs.ir",
+          "test_package": "http"
+        },
+        "gradle": {
+          "enabled": true,
+          "maven_central_url": "https://pub-azs.ir/api/mavens/",
+          "google_maven_url": "https://pub-azs.ir/api/mavens/",
+          "gradle_plugins_url": null,
+          "distribution_url": null
+        },
+        "android": {
+          "enabled": true,
+          "google_maven_url": "https://pub-azs.ir/api/mavens/"
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "No iOS CocoaPods or SPM mirror available on pub-azs"
+        }
+      }
+    },
+    {
+      "id": "runflare",
+      "name": "Runflare Cloud Mirrors",
+      "description": "Verified Flutter Storage, Dart Pub, Maven Central, and Gradle distributions mirror in Iran",
+      "website": "https://runflare.com/mirrors",
+      "enabled": true,
+      "priority": 2,
+      "providers": {
+        "flutter": {
+          "enabled": true,
+          "storage_url": "https://mirror-gcs.runflare.com",
+          "test_path": "flutter_infra_release/releases/releases_linux.json"
+        },
+        "dart": {
+          "enabled": true,
+          "hosted_url": "https://mirror-flutter.runflare.com",
+          "test_package": "http"
+        },
+        "gradle": {
+          "enabled": true,
+          "maven_central_url": "https://mirror-maven.runflare.com/maven2/",
+          "google_maven_url": null,
+          "gradle_plugins_url": null,
+          "distribution_url": "https://mirror-maven.runflare.com/distributions/"
+        },
+        "android": {
+          "enabled": false,
+          "google_maven_url": null
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "No iOS CocoaPods or SPM mirror available on runflare"
+        }
+      }
+    },
+    {
+      "id": "flutter-cn",
+      "name": "Flutter Community Mirror (CN)",
+      "description": "Global community mirror for Flutter SDK binaries and Dart packages",
+      "website": "https://flutter.cn",
+      "enabled": true,
+      "priority": 3,
+      "providers": {
+        "flutter": {
+          "enabled": true,
+          "storage_url": "https://storage.flutter-io.cn",
+          "test_path": "flutter_infra_release/releases/releases_linux.json"
+        },
+        "dart": {
+          "enabled": true,
+          "hosted_url": "https://pub.flutter-io.cn",
+          "test_package": "http"
+        },
+        "gradle": {
+          "enabled": false,
+          "maven_central_url": null,
+          "google_maven_url": null,
+          "gradle_plugins_url": null,
+          "distribution_url": null
+        },
+        "android": {
+          "enabled": false,
+          "google_maven_url": null
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "Community mirror does not support iOS cocoapods"
+        }
+      }
+    },
+    {
+      "id": "jamko",
+      "name": "Jamko / Chrepo Maven Mirror",
+      "description": "Iranian mirror for Gradle Maven Central and Android dependencies",
+      "website": "https://jamko.ir",
+      "enabled": true,
+      "priority": 4,
+      "providers": {
+        "flutter": {
+          "enabled": false,
+          "storage_url": "",
+          "test_path": null
+        },
+        "dart": {
+          "enabled": false,
+          "hosted_url": "",
+          "test_package": null
+        },
+        "gradle": {
+          "enabled": true,
+          "maven_central_url": "https://gradle.chrepo.ir",
+          "google_maven_url": "https://gradle.chrepo.ir",
+          "gradle_plugins_url": null,
+          "distribution_url": null
+        },
+        "android": {
+          "enabled": true,
+          "google_maven_url": "https://gradle.chrepo.ir"
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "Jamko focuses on JVM / Android Gradle"
+        }
+      }
+    },
+    {
+      "id": "iranserver",
+      "name": "IranServer Maven Mirror",
+      "description": "Internal Iranian Maven repository mirror for Java/Android dependencies",
+      "website": "https://mirror.iranserver.com",
+      "enabled": true,
+      "priority": 5,
+      "providers": {
+        "flutter": {
+          "enabled": false,
+          "storage_url": "",
+          "test_path": null
+        },
+        "dart": {
+          "enabled": false,
+          "hosted_url": "",
+          "test_package": null
+        },
+        "gradle": {
+          "enabled": true,
+          "maven_central_url": "https://maven.iranserver.com/repository/maven/",
+          "google_maven_url": null,
+          "gradle_plugins_url": null,
+          "distribution_url": null
+        },
+        "android": {
+          "enabled": false,
+          "google_maven_url": null
+        },
+        "ios": {
+          "enabled": false,
+          "notes": "Maven dependencies only"
+        }
+      }
+    }
+  ]
+}
