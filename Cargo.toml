@@ -1,0 +1,57 @@
+[package]
+name = "package-downloader"
+version = "2.0.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["IR-Flutter Community <https://github.com/IR-Flutter>"]
+description = "Native cross-platform Development Environment Mirror Manager"
+license = "MIT"
+repository = "https://github.com/IR-Flutter/PackageDownloader"
+homepage = "https://ir-flutter.github.io/PackageDownloader/"
+keywords = ["flutter", "dart", "gradle", "mirror", "iran"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "pdown"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pdown"
+path = "src/main.rs"
+
+[[bin]]
+name = "irflutter"
+path = "src/bin/irflutter.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "cargo", "env"] }
+tokio = { version = "1.40", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+directories = "5.0"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+tempfile = "3.12"
+similar = "2.6"
+sha2 = "0.10"
+base64 = "0.22"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.12"
+
+[profile.dev]
+debug = 1
+
+[profile.test]
+debug = 1
+

@@ -1,6 +1,8 @@
 .dart_tool/
 .packages
 build/
+target/
+pdown
 irflutter
 irflutter.exe
 *.log
@@ -8,3 +10,5 @@ irflutter.exe
 .DS_Store
 pubspec.lock
 .idea
+.openidea
+

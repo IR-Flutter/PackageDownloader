@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 1: Rust architecture and foundation (`package-downloader` v2.0.0).
+  - Configured native binaries `pdown` and alias `irflutter`.
+  - Comprehensive CLI definition using `clap` (derive).
+  - Error hierarchy using `thiserror` with standardized POSIX exit codes.
+  - Core domain models for registries, provider contracts, profiles, diffs, and benchmarks.
+  - Infrastructure layer: multi-platform storage paths, Ed25519 signature engine, HTTP client, and `tracing` logging.
+  - Enforced zero clippy warnings and strict code formatting.
 - Phase 0: Complete repository audit and verification of mirror endpoints (`docs/audit/REPOSITORY_AUDIT.md`).
 - Software architecture specification (`docs/architecture/SOFTWARE_ARCHITECTURE.md`).
 - Technical design blueprint (`docs/architecture/TECHNICAL_DESIGN.md`).
