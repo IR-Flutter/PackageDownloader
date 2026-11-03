@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-03
+
+### Added
+- **Production Hardening & Remote Mirror Expansion:**
+  - Expanded verified mirror registry to revision 2 (`registry/mirrors.json`) with live-tested endpoints for Myket, TarazERP, Runflare, PUB-AZS, Aliyun, Flutter-CN, Jamko, and IranServer.
+  - Comprehensive provider capabilities and verified artifact routes for Flutter Storage, Dart Pub, Maven Central, Google Maven, Gradle Plugins, and Gradle Distributions.
+  - Fail-closed installer checksum enforcement in `install.sh` and `install.ps1`: installations abort immediately if `checksums.txt` is missing or mismatched.
+  - Automated `gradle/wrapper/gradle-wrapper.properties` distribution URL configuration and rollback for project and global Gradle distribution routing.
+  - Multi-factor weighted quality benchmark engine (40% availability, 25% reliability, 20% latency, 15% throughput) with penalties preventing partially broken mirrors from being recommended as 100% healthy.
+  - Cross-platform tool detection in `doctor` inspecting PATH, PATHEXT (.com, .exe, .bat, .cmd), and `where.exe` on Windows.
+  - Automated CI Quality Gates workflow (`.github/workflows/ci.yml`) enforcing code style, strict linter checks, schema/signature validation, and cross-platform matrix testing on Linux, macOS, and Windows.
+  - Dedicated registry verification and maintainer signing workflow (`.github/workflows/registry-signing.yml`) with zero-dependency `sign_registry` binary tool.
+  - Generation-based registry caching with atomic directory rename and automatic recovery to `last_known_good_generation`.
+  - Exact raw byte preservation for cached registry JSON, completely eliminating cryptographic signature invalidation caused by JSON re-serialization.
+  - Monotonic anti-rollback state persisted in `$DATA_DIR/registry_state.json`, forbidding older revision acceptance even with `--force`.
+  - Single-quote POSIX shell variable escaping and shell metacharacter injection protection in environment variable managers.
+  - Structured rollback failure reporting returning both primary error, rollback errors, and backup directory recovery guidance.
+
+### Changed
+- Disabled unverified and failing Novin Cloud endpoints (`enabled: false`) with explicit verification status metadata.
+- Upgraded `registry/schema.json` with provider capability flags, provider types, and documentation metadata.
+- Replaced Gradle init script silent `catch (ignored) {}` with diagnostic logging.
+
+---
+
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added

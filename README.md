@@ -39,17 +39,22 @@ irm https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.
 
 ## 🌐 لیست میرورهای تأییدشده و پوشش سرویس‌ها
 
-| شناسه میرور | نام میرور | Flutter Storage | Dart / Pub | Gradle Maven | Android Google Maven | دستور فعال‌سازی |
-| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| `pub-azs` | **PUB-AZS** | ❌ (عدم پشتیبانی) | ✅ | ✅ | ✅ | `pdown use pub-azs` |
-| `runflare` | **Runflare (رن‌فلر)** | ✅ | ✅ | ✅ (Maven Central) | ❌ | `pdown use runflare` |
-| `flutter-cn` | **Flutter Community (CN)** | ✅ | ✅ | ❌ | ❌ | `pdown use flutter-cn` |
-| `jamko` | **Jamko / Chrepo** | ❌ | ❌ | ✅ | ✅ | `pdown use jamko --only gradle` |
-| `iranserver` | **IranServer (ایران‌سرور)** | ❌ | ❌ | ✅ | ❌ | `pdown use iranserver --only gradle` |
-| `official` | **مخازن رسمی گوگل** | پیش‌فرض | پیش‌فرض | پیش‌فرض | پیش‌فرض | `pdown reset` |
+| شناسه میرور | نام میرور | Flutter Storage | Dart / Pub | Maven Central | Google Maven | Gradle Plugins | Gradle Dist | دستور فعال‌سازی |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| `myket` | **مایکت (Myket)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `pdown use myket` |
+| `tarazerp` | **تراز سامانه (TarazERP)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | `pdown use tarazerp` |
+| `runflare` | **رن‌فلر (Runflare)** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | `pdown use runflare` |
+| `pub-azs` | **پاب‌آذرخش (PUB-AZS)** | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | `pdown use pub-azs` |
+| `aliyun` | **علی‌بابا کلود (Aliyun)** | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | `pdown use aliyun --only gradle` |
+| `flutter-cn` | **کامیونیتی فلاتر چین** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | `pdown use flutter-cn` |
+| `jamko` | **جامکو (Jamko / Chrepo)** | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | `pdown use jamko --only gradle` |
+| `iranserver` | **ایران‌سرور (IranServer)** | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | `pdown use iranserver --only gradle` |
+| `novin` | **نوین‌کلود (Novin)** | ⚠️ غیرفعال | ⚠️ غیرفعال | ⚠️ غیرفعال | ⚠️ غیرفعال | ⚠️ غیرفعال | ⚠️ غیرفعال | *(به دلیل قطعی اندپوینتها غیرفعال است)* |
+| `official` | **مخازن رسمی بالا‌دستی** | پیش‌فرض | پیش‌فرض | پیش‌فرض | پیش‌فرض | پیش‌فرض | پیش‌فرض | `pdown reset` |
 
 > [!NOTE]
-> با توجه به عدم ارائه مخزن معتبر و تأییدشده برای CocoaPods CDN در ایران، اکوسیستم iOS برای محافظت از پروژه‌های توسعه‌دهندگان به‌صورت پیش‌فرض غیرفعال است.
+> با توجه به عدم ارائه مخزن معتبر و تأییدشده برای CocoaPods CDN در ایران، اکوسیستم iOS برای محافظت از پروژه‌های توسعه‌دهندگان به‌صورت پیش‌فرض محافظت‌شده و غیرفعال است.
+> تمامی اندپوینتهای بالا با تست لایو پکیج‌های واقعی اعتبارسنجی شده‌اند. جزئیات کامل در مستند [گزارش اعتبارسنجی میرورها](docs/MIRROR_VERIFICATION_REPORT.md) موجود است.
 
 ---
 
@@ -125,9 +130,12 @@ pdown doctor --json
 
 * [معماری نرم‌افزار (Software Architecture)](docs/architecture/SOFTWARE_ARCHITECTURE.md)
 * [مشخصات فنی و طراحی سیستم (Technical Design)](docs/architecture/TECHNICAL_DESIGN.md)
-* [گزارش ممیزی کد و ارزیابی میرورها (Repository Audit)](docs/audit/REPOSITORY_AUDIT.md)
+* [گزارش ممیزی کد نسخه ۲ (Repository Audit)](docs/audit/REPOSITORY_AUDIT.md)
+* [گزارش جامع مقاوم‌سازی امنیتی و قابلیت اطمینان (Production Hardening Audit)](docs/PRODUCTION_HARDENING_AUDIT.md)
+* [گزارش اعتبارسنجی زنده اندپوینتهای میرورها (Mirror Verification Report)](docs/MIRROR_VERIFICATION_REPORT.md)
 * [مشخصات رجیستری پویا (Registry Specification)](docs/REGISTRY_SPECIFICATION.md)
 * [امنیت و راستی‌آزمایی رمزنگاری رجیستری (Registry Security)](docs/REGISTRY_SECURITY.md)
+* [راهنمای بازیابی و وضعیت اضطراری (Recovery Guide)](docs/RECOVERY.md)
 * [راهنمای اکوسیستم‌ها و پرووایدرها (Providers Guide)](docs/PROVIDERS.md)
 * [راهنمای جامع دستورات (Usage Guide)](docs/USAGE.md)
 * [راهنمای نصب و بیلد (Installation)](docs/INSTALLATION.md)

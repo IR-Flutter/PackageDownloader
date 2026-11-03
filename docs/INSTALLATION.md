@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/i
 irm https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.ps1 | iex
 ```
 
-The installer automatically detects OS and architecture, verifies SHA-256 checksums from the signed release manifest, and places the binary into your PATH.
+The installer automatically detects OS and architecture, downloads the matching binary and `checksums.txt`, and enforces **fail-closed cryptographic SHA-256 integrity verification**. If the checksum manifest is unreachable, corrupted, or does not match the binary, installation aborts immediately with exit code 1 to protect your machine. Upon verification, the binary is safely placed into your user PATH.
 
 ---
 
