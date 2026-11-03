@@ -1,14 +1,23 @@
-# 🚀 IR-Flutter Package Downloader & Mirror Manager
+# 🚀 PackageDownloader 2.0 (`pdown`)
 
-ابزار خط فرمان متن‌باز، سبک و چندسکویی (Cross-Platform) برای مدیریت، تست و تغییر آنی میرورهای فلاتر، دارت و گریدل در ایران جهت دور زدن تحریم‌ها و رفع مشکلات فیلترینگ یا کندی سرعت.
-
-شامل تمامی میرورهای رسمی، مراجع ایرانی و فهرست میرورهای ارائه‌شده در [ramineslami.ir/mirrors](https://ramineslami.ir/mirrors).
+ابزار بومی، فوق‌سریع، چندسکویی (Cross-Platform) و بدون نیاز به پیش‌نیاز (Zero-Dependency) به زبان Rust برای مدیریت، تست و تغییر آنی میرورهای توسعه‌دهندگان در ایران (**فلاتر**، **دارت**، **گریدل** و **اندروید**) جهت دور زدن تحریم‌ها و رفع مشکلات فیلترینگ یا کندی سرعت.
 
 [![Release](https://img.shields.io/github/v/release/IR-Flutter/PackageDownloader?color=blue&label=Latest%20Release)](https://github.com/IR-Flutter/PackageDownloader/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/IR-Flutter/PackageDownloader/actions/workflows/ci.yml/badge.svg)](https://github.com/IR-Flutter/PackageDownloader/actions)
 [![Build & Release](https://github.com/IR-Flutter/PackageDownloader/actions/workflows/release.yml/badge.svg)](https://github.com/IR-Flutter/PackageDownloader/actions)
 
 🌐 **صفحه وب راهنما و دایرکتوری آنلاین:** [https://ir-flutter.github.io/PackageDownloader/](https://ir-flutter.github.io/PackageDownloader/)
+
+---
+
+## ⚡ تفاوت‌های کلیدی و پیشرفت‌های نسخه ۲.۰
+
+* **بازنویسی کامل با Rust:** بدون نیاز به نصب Dart، Flutter یا جاوا روی سیستم کاربر. اجرای آنی در چند میلی‌ثانیه.
+* **رجیستری پویا با امضای دیجیتال (Ed25519):** به‌روزرسانی خودکار لیست میرورها بدون نیاز به بیلد و دانلود مجدد برنامه، با اعتبارسنجی رمزنگاری‌شده و حفاظت در برابر بازگشت به عقب (Anti-Rollback).
+* **تراکنش‌های امن و بازگشت‌پذیر (Safe Transactions):** ایجاد پشتیبان خودکار (SHA-256) قبل از تغییر هر فایل، قابلیت پیش‌نمایش تغییرات با `--dry-run`، و بازگردانی خودکار در صورت بروز هرگونه خطا.
+* **جداسازی هوشمند اکوسیستم‌ها:** جلوگیری از ادغام اشتباه مخازن؛ تفکیک باینری‌های موتور فلاتر (`flutter_infra_release`) از پکیج‌های Pub، و تفکیک Google Maven از Maven Central در Gradle.
+* **تست چندمرحله‌ای واقعی:** سنجش سلامت واقعی مخازن بر اساس دانلود نمونه پکیج‌ها و متادیتاها (نه صرفاً پینگ صفحه اصلی).
 
 ---
 
@@ -24,86 +33,108 @@ curl -fsSL https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/i
 irm https://raw.githubusercontent.com/IR-Flutter/PackageDownloader/main/install.ps1 | iex
 ```
 
+> **نکته:** دستور `irflutter` همچنان به عنوان نام مستعار (Alias) برای سازگاری کامل با اسکریپت‌های قبلی شما کار می‌کند.
+
 ---
 
-## 🌐 لیست کامل میرورهای پشتیبانی‌شده در ایران
+## 🌐 لیست میرورهای تأییدشده و پوشش سرویس‌ها
 
-| نام میرور | پوشش سرویس | منبع / مرجع | آدرس Flutter & Dart | آدرس Gradle Maven | دستور فعال‌سازی |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **PUB-AZS** | فلاتر + دارت + گریدل | جامعه فلاتر | `https://pub-azs.ir` | `https://pub-azs.ir/api/mavens/` | `irflutter use pub-azs` |
-| **Runflare (رن‌فلر)** | فلاتر + دارت + گریدل | رامین اسلامی | `https://mirror-flutter.runflare.com` | `https://mirror-maven.runflare.com/maven2/` | `irflutter use runflare` |
-| **Jamko / Chrepo** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://gradle.chrepo.ir` | `irflutter use-gradle jamko` |
-| **IranServer (ایران‌سرور)** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://maven.iranserver.com/repository/maven/` | `irflutter use-gradle iranserver` |
-| **ITO National (سازمان فناوری)** | اندروید گریدل و ماون | رامین اسلامی | مخازن رسمی | `https://archive.ito.gov.ir/gradle/maven_central/` | `irflutter use-gradle ito` |
-| **Flutter Community (CN)** | فلاتر + دارت | جامعه فلاتر | `https://pub.flutter-io.cn` | — | `irflutter use-flutter flutter-cn` |
-| **مخازن رسمی (گوگل)** | بدون میرور | مخازن اصلی | `https://pub.dev` | مخازن اصلی Maven | `irflutter reset` |
+| شناسه میرور | نام میرور | Flutter Storage | Dart / Pub | Gradle Maven | Android Google Maven | دستور فعال‌سازی |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| `pub-azs` | **PUB-AZS** | ❌ (عدم پشتیبانی) | ✅ | ✅ | ✅ | `pdown use pub-azs` |
+| `runflare` | **Runflare (رن‌فلر)** | ✅ | ✅ | ✅ (Maven Central) | ❌ | `pdown use runflare` |
+| `flutter-cn` | **Flutter Community (CN)** | ✅ | ✅ | ❌ | ❌ | `pdown use flutter-cn` |
+| `jamko` | **Jamko / Chrepo** | ❌ | ❌ | ✅ | ✅ | `pdown use jamko --only gradle` |
+| `iranserver` | **IranServer (ایران‌سرور)** | ❌ | ❌ | ✅ | ❌ | `pdown use iranserver --only gradle` |
+| `official` | **مخازن رسمی گوگل** | پیش‌فرض | پیش‌فرض | پیش‌فرض | پیش‌فرض | `pdown reset` |
+
+> [!NOTE]
+> با توجه به عدم ارائه مخزن معتبر و تأییدشده برای CocoaPods CDN در ایران، اکوسیستم iOS برای محافظت از پروژه‌های توسعه‌دهندگان به‌صورت پیش‌فرض غیرفعال است.
 
 ---
 
 ## 💻 دستورات و نحوه استفاده (Usage)
 
-### ۱. مشاهده لیست کامل میرورها:
+### ۱. مشاهده لیست میرورها و قابلیت‌ها:
 ```bash
-irflutter list
+pdown list
+# یا فیلتر براساس اکوسیستم:
+pdown list --provider flutter
 ```
 
-### ۲. تست سرعت و پینگ میرورها:
+### ۲. تست سرعت زنده و سلامت میرورها (Benchmark):
 ```bash
-irflutter test
+pdown test
+# یا تست یک میرور خاص با تعیین تایم‌اوت:
+pdown test --mirror pub-azs --timeout 5
 ```
 
-### ۳. فعال‌سازی کامل میرور (فلاتر + گریدل):
+### ۳. فعال‌سازی هوشمند میرور:
 ```bash
-irflutter use pub-azs
-# یا
-irflutter use runflare
+pdown use runflare
+# یا فعال‌سازی فقط برای یک اکوسیستم خاص:
+pdown use pub-azs --only dart
+# یا فعال‌سازی فقط برای گریدل:
+pdown use jamko --only gradle
 ```
 
-### ۴. فعال‌سازی اختصاصی گریدل (Gradle/Maven):
-اگر می‌خواهید فقط پکیج‌های اندروید گریدل از میرورهایی مثل جامکو یا ایران‌سرور دانلود شوند:
+### ۴. پیش‌نمایش تغییرات قبل از اعمال (Dry-Run):
 ```bash
-irflutter use-gradle jamko
-# یا
-irflutter use-gradle iranserver
+pdown use runflare --dry-run
 ```
 
-### ۵. فعال‌سازی اختصاصی فلاتر و دارت:
+### ۵. بازگشت به تنظیمات اصلی و حذف تمام میرورها:
 ```bash
-irflutter use-flutter flutter-cn
+pdown reset
 ```
 
-### ۶. بازگشت به تنظیمات اصلی (غیرفعال‌سازی میرور):
+### ۶. عیب‌یابی و بررسی وضعیت سیستم (Doctor):
 ```bash
-irflutter reset
+pdown doctor
 ```
 
-### ۷. مشاهده وضعیت فعلی سیستم:
+### ۷. مشاهده وضعیت فعلی متغیرها و فایل‌های کانفیگ:
 ```bash
-irflutter status
+pdown status
+```
+
+### ۸. بررسی و به‌روزرسانی رجیستری میرورها از گیت‌هاب:
+```bash
+pdown registry status
+pdown registry check
+pdown registry update
+```
+
+### ۹. مدیریت پروفایل‌ها (Profiles):
+```bash
+pdown profile list
+pdown profile use iran
+pdown profile create work-project
+```
+
+### ۱۰. حالت خروجی JSON (جهت اتوماسیون و IDEها):
+```bash
+pdown list --json
+pdown status --json
+pdown doctor --json
 ```
 
 ---
 
-## 📦 دانلود دستی فایل‌های اجرایی (Releases)
+## 📚 مستندات تکمیلی
 
-در صفحه [GitHub Releases](https://github.com/IR-Flutter/PackageDownloader/releases)، فایل‌های اجرایی کامپایل‌شده بدون نیاز به ران‌تایم Dart برای سیستم‌عامل‌های زیر در دسترس است:
-* **ویندوز:** `irflutter-windows-x64.exe`
-* **مک (Apple Silicon M1..M4):** `irflutter-macos-arm64`
-* **مک (Intel):** `irflutter-macos-x64`
-* **لینوکس:** `irflutter-linux-x64`
-
----
-
-## 🛠 کامپایل دستی از سورس کد
-
-```bash
-git clone https://github.com/IR-Flutter/PackageDownloader.git
-cd PackageDownloader
-dart compile exe bin/irflutter.dart -o irflutter
-./irflutter list
-```
+* [معماری نرم‌افزار (Software Architecture)](docs/architecture/SOFTWARE_ARCHITECTURE.md)
+* [مشخصات فنی و طراحی سیستم (Technical Design)](docs/architecture/TECHNICAL_DESIGN.md)
+* [گزارش ممیزی کد و ارزیابی میرورها (Repository Audit)](docs/audit/REPOSITORY_AUDIT.md)
+* [مشخصات رجیستری پویا (Registry Specification)](docs/REGISTRY_SPECIFICATION.md)
+* [امنیت و راستی‌آزمایی رمزنگاری رجیستری (Registry Security)](docs/REGISTRY_SECURITY.md)
+* [راهنمای اکوسیستم‌ها و پرووایدرها (Providers Guide)](docs/PROVIDERS.md)
+* [راهنمای جامع دستورات (Usage Guide)](docs/USAGE.md)
+* [راهنمای نصب و بیلد (Installation)](docs/INSTALLATION.md)
+* [عیب‌یابی و حل مشکلات (Troubleshooting)](docs/TROUBLESHOOTING.md)
+* [نقشه راه توسعه (Roadmap)](docs/ROADMAP.md)
 
 ---
 
 ## 📄 لایسنس
-این پروژه تحت لایسنس **MIT** منتشر شده است و برای تمام توسعه‌دهندگان فلاتر در ایران کاملاً رایگان و متن‌باز است.
+این پروژه تحت لایسنس **MIT** منتشر شده است و برای تمام توسعه‌دهندگان فلاتر و اندروید کاملاً رایگان و متن‌باز است.

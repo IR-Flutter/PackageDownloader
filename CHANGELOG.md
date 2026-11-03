@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 8: Release Engineering & Supply-Chain Hardening.
+  - Implemented secure `install.sh` and `install.ps1` with automated SHA-256 checksum verification.
+  - Pinned GitHub Actions CI/CD workflows (`.github/workflows/ci.yml` and `.github/workflows/release.yml`).
+  - Added matrix compilation targets: Linux x64, macOS Apple Silicon (arm64), macOS Intel (x64), and Windows x64.
+  - Release manifest generation with SHA-256 checksums and automated tag-based release packaging.
+  - Created community documentation: `CONTRIBUTING.md`, `SECURITY.md`, and complete `README.md`.
 - Phase 7: Cross-Platform Validation & Binary Parity.
   - Validated cross-platform CLI execution with `assert_cmd`.
   - Verified binary alias parity between `pdown` and `irflutter`.
