@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0-alpha.1] - 2026-11-03
 
 ### Added
+- Phase 3: Provider Implementations & Ecosystem Boundaries.
+  - Implemented modular `Provider` trait and engine.
+  - `FlutterProvider`: Handles `FLUTTER_STORAGE_BASE_URL` with verification that the target mirror actually hosts `flutter_infra_release` SDK artifacts.
+  - `DartProvider`: Handles `PUB_HOSTED_URL` for pub.dev package proxying.
+  - `GradleProvider`: Non-destructively manages `~/.gradle/init.d/pdown-mirror.gradle` and timeout properties in `gradle.properties`. Solved Maven Central vs Google Maven collisions.
+  - `AndroidProvider`: Handles Google Maven and Android SDK artifact proxying.
+  - `IosProvider`: Guarded unsupported provider with informative diagnostic explanation.
+  - Implemented `pdown status` across all providers with human-readable and `--json` modes.
+  - Provider integration tests in `tests/providers_test.rs`.
+  - Comprehensive provider documentation in `docs/PROVIDERS.md`.
 - Phase 2: Remote Mirror Registry & Cryptographic Verification.
   - Implemented 3-tier registry resolution: Bundled snapshot, persistent Cache, and Remote GitHub raw endpoint.
   - Ed25519 digital signature generation and verification (`mirrors.json.sig`).

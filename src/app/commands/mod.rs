@@ -13,10 +13,7 @@ pub async fn execute(cli: Cli) -> Result<()> {
         Some(Commands::List(args)) => handle_list(&registry, args, cli.json).await,
         Some(Commands::Mirror(args)) => handle_mirror(&registry, args, cli.json).await,
         Some(Commands::Registry(args)) => handle_registry(&registry, args, cli.json).await,
-        Some(Commands::Status(_args)) => {
-            println!("pdown status - available in Phase 3");
-            Ok(())
-        }
+        Some(Commands::Status(args)) => handle_status(args, cli.json).await,
         Some(Commands::Test(_args)) => {
             println!("pdown test - available in Phase 5");
             Ok(())
@@ -48,6 +45,35 @@ pub async fn execute(cli: Cli) -> Result<()> {
             Ok(())
         }
     }
+}
+
+async fn handle_status(_args: crate::app::cli::StatusArgs, json: bool) -> Result<()> {
+    let providers = crate::providers::all_providers();
+    let mut statuses = Vec::new();
+
+    for p in providers {
+        statuses.push(p.detect_current()?);
+    }
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&statuses)?);
+        return Ok(());
+    }
+
+    println!("\n📊 Current System & Ecosystem Mirror Status:\n");
+    for s in &statuses {
+        let active_badge = if s.is_active {
+            "🟢 Active (Mirrored)"
+        } else {
+            "⚪ Inactive (Upstream Default)"
+        };
+        println!("🔹 {} [{}]", s.provider_id.to_uppercase(), active_badge);
+        for (k, v) in &s.details {
+            println!("   {}: {}", k, v);
+        }
+        println!();
+    }
+    Ok(())
 }
 
 async fn handle_list(registry: &RegistryManager, args: ListArgs, json: bool) -> Result<()> {
